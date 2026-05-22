@@ -1,11 +1,15 @@
 import json
 from pathlib import Path
 
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 
 from app.config import LLM_PROVIDER, llm_provider_label, uses_mock_llm
 from app.pipeline import run_pipeline
+from app.process.api.router import router as process_router
 from app.schemas import AnalyzeRequest
 
 app = FastAPI(
@@ -13,6 +17,8 @@ app = FastAPI(
     description="RPA(UiPath) ↔ Agentic AI 연동 데모. STT/OCR·알림 연동 구간은 to_be_generated.",
     version="0.1.0",
 )
+
+app.include_router(process_router)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = BASE_DIR / "output"
@@ -27,6 +33,7 @@ def root():
             "health": "/health",
             "analyze": "POST /analyze",
             "analyze_file": "POST /analyze/file",
+            "process": "POST /process (STT+OCR 병렬 → 분석 원스톱)",
             "sample": "GET /sample-input",
         },
     }

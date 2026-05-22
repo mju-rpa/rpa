@@ -2,7 +2,7 @@ import json
 import logging
 from abc import ABC, abstractmethod
 
-from ocr.api.schemas import Medicine, OcrResponse
+from app.ocr.api.schemas import Medicine, OcrResponse
 
 logger = logging.getLogger(__name__)
 

@@ -5,9 +5,9 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile
 
-from stt.api.schemas import ALLOWED_EXTENSIONS, TranscribeResponse
-from stt.core.config import stt_config
-from stt.core.transcriber import ClovaSpeechTranscriber, OpenAIWhisperTranscriber, RemoteWhisperTranscriber
+from app.stt.api.schemas import ALLOWED_EXTENSIONS, TranscribeResponse
+from app.stt.core.config import stt_config
+from app.stt.core.transcriber import ClovaSpeechTranscriber, OpenAIWhisperTranscriber, RemoteWhisperTranscriber
 
 logger = logging.getLogger(__name__)
 

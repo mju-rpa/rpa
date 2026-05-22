@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from stt.core.transcriber import TranscriptionResult
+from app.stt.core.transcriber import TranscriptionResult
 
 
 class BaseAgent(ABC):

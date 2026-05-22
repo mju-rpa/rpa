@@ -3,9 +3,9 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile
 
-from ocr.api.schemas import ALLOWED_EXTENSIONS, OcrResponse
-from ocr.core.config import ocr_config
-from ocr.core.extractor import GeminiExtractor
+from app.ocr.api.schemas import ALLOWED_EXTENSIONS, OcrResponse
+from app.ocr.core.config import ocr_config
+from app.ocr.core.extractor import GeminiExtractor
 
 logger = logging.getLogger(__name__)
 
