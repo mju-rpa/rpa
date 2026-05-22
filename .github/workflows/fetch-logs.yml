@@ -1,0 +1,36 @@
+# 로그 가져오는 yaml 파일입니다.
+# Secret Variable에 API_KEY 및 ID 등록 끝마쳤습니다.
+
+name: Auto Fetch Render Logs & Keep Alive
+
+on:
+  schedule:
+    - cron: '*/14 * * * *' # 14분마다 자동으로 실행해서 Render 서버 계속 가동하기
+  workflow_dispatch: # GitHub 웹사이트에서 내가 원할 때 수동으로 실행 버튼 누르기 가능
+
+jobs:
+  fetch-log:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Fetch Logs from Render
+        run: |
+          # 1. 루트 디렉토리에 logs 폴더가 없다면 생성
+          mkdir -p logs 
+          
+          # 2. Render API를 호출하여 logs/fetch_log.json 파일로 저장 (매번 최신으로 덮어쓰기)
+          curl -s -X GET "https://api.render.com/v1/logs?ownerId=${{ secrets.OWNER_ID }}&resource=${{ secrets.SERVICE_ID }}" \
+               -H "Accept: application/json" \
+               -H "Authorization: Bearer ${{ secrets.API_KEY }}" > logs/fetch_log.json
+
+      - name: Commit and Push if changed
+        run: |
+          git config --global user.name "Log-Bot"
+          git config --global user.email "bot@github.com"
+          
+          # 3. logs/fetch_log.json 파일의 변경사항만 추적해서 깃허브에 푸시
+          git add logs/fetch_log.json
+          git commit -m "chore: update render logs & keep alive [skip ci]" || exit 0
+          git push
