@@ -2,14 +2,17 @@ import json
 from pathlib import Path
 
 from dotenv import load_dotenv
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=True)
+
+import os
+print(f"[startup] TRANSCRIBER_TYPE={os.getenv('TRANSCRIBER_TYPE')}", flush=True)
 
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 
 from app.config import LLM_PROVIDER, llm_provider_label, uses_mock_llm
 from app.pipeline import run_pipeline
-from app.process.api.router import router as process_router
+from app.input_process.api.router import router as input_process_router
 from app.schemas import AnalyzeRequest
 
 app = FastAPI(
@@ -18,7 +21,7 @@ app = FastAPI(
     version="0.1.0",
 )
 
-app.include_router(process_router)
+app.include_router(input_process_router)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = BASE_DIR / "output"
@@ -33,7 +36,7 @@ def root():
             "health": "/health",
             "analyze": "POST /analyze",
             "analyze_file": "POST /analyze/file",
-            "process": "POST /process (STT+OCR 병렬 → 분석 원스톱)",
+            "input_process": "POST /input-process (STT+OCR 병렬 → AnalyzeRequest 조립)",
             "sample": "GET /sample-input",
         },
     }

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
 
@@ -9,6 +9,13 @@ class Medicine(BaseModel):
     frequency: str | None = None
     timing: str | None = None
     caution: str | None = None
+
+    @field_validator("dosage", "frequency", "timing", "caution", mode="before")
+    @classmethod
+    def coerce_to_str(cls, v):
+        if v is None:
+            return v
+        return str(v)
 
 
 class OcrResponse(BaseModel):

@@ -15,8 +15,8 @@ class STTConfig:
     clova_secret_key: str = field(default_factory=lambda: os.getenv("CLOVA_SECRET_KEY", ""))
     clova_speaker_count_min: int = int(os.getenv("CLOVA_SPEAKER_COUNT_MIN", "2"))
     clova_speaker_count_max: int = int(os.getenv("CLOVA_SPEAKER_COUNT_MAX", "2"))
-    # "remote" | "openai" | "clova"
-    transcriber_type: str = field(default_factory=lambda: os.getenv("TRANSCRIBER_TYPE", "remote"))
+    # "local" | "remote" | "openai" | "clova"
+    transcriber_type: str = field(default_factory=lambda: os.getenv("TRANSCRIBER_TYPE", "local"))
 
 
 stt_config = STTConfig()

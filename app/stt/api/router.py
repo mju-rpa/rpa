@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, UploadFile
 
 from app.stt.api.schemas import ALLOWED_EXTENSIONS, TranscribeResponse
 from app.stt.core.config import stt_config
-from app.stt.core.transcriber import ClovaSpeechTranscriber, OpenAIWhisperTranscriber, RemoteWhisperTranscriber
+from app.stt.core.transcriber import ClovaSpeechTranscriber, OpenAIWhisperTranscriber, RemoteWhisperTranscriber, WhisperTranscriber
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +26,17 @@ elif stt_config.transcriber_type == "clova":
         speaker_count_min=stt_config.clova_speaker_count_min,
         speaker_count_max=stt_config.clova_speaker_count_max,
     )
-else:
+elif stt_config.transcriber_type == "remote":
     transcriber = RemoteWhisperTranscriber(
         server_url=stt_config.whisper_server_url,
         language=stt_config.language,
+    )
+else:  # "local" (default)
+    transcriber = WhisperTranscriber(
+        model_size=stt_config.model_size,
+        language=stt_config.language,
+        device=stt_config.device,
+        compute_type=stt_config.compute_type,
     )
 
 

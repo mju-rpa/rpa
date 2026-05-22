@@ -1,6 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -83,8 +84,19 @@ class ClovaSpeechTranscriber(Transcriber):
         self._speaker_count_min = speaker_count_min
         self._speaker_count_max = speaker_count_max
 
+    _MIME_MAP = {
+        ".mp3": "audio/mpeg",
+        ".wav": "audio/wav",
+        ".m4a": "audio/mp4",
+        ".ogg": "audio/ogg",
+        ".flac": "audio/flac",
+    }
+
     def transcribe(self, file_path: str) -> TranscriptionResult:
         logger.info("[ClovaSpeechTranscriber] 전사 시작: %s", file_path)
+        ext = Path(file_path).suffix.lower()
+        mime_type = self._MIME_MAP.get(ext, "audio/mpeg")
+        logger.info("[ClovaSpeechTranscriber] MIME 타입: %s", mime_type)
 
         params = {
             "language": self._language,
@@ -100,12 +112,14 @@ class ClovaSpeechTranscriber(Transcriber):
             response = self._client.post(
                 f"{self._invoke_url}/recognizer/upload",
                 headers={"X-CLOVASPEECH-API-KEY": self._secret_key},
-                files={"media": (file_path, f, "audio/wav")},
+                files={"media": (file_path, f, mime_type)},
                 data={"params": __import__("json").dumps(params)},
             )
 
         response.raise_for_status()
         body = response.json()
+        if body.get("result") != "COMPLETED":
+            raise RuntimeError(f"Clova STT 실패: result={body.get('result')}, message={body.get('message')}")
         logger.debug("[ClovaSpeechTranscriber] 응답: %s", body)
 
         segments = self._parse_segments(body)
