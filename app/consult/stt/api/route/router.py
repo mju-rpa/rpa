@@ -5,47 +5,48 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile
 
-from app.stt.schema.models import ALLOWED_EXTENSIONS, TranscribeResponse
+# Directory 정리하면서 import 위치가 변경되었습니다.
+# 아래는 기존 위치
+"""
+from app.stt.api.schemas import ALLOWED_EXTENSIONS, TranscribeResponse
 from app.stt.core.config import stt_config
 from app.stt.core.transcriber import ClovaSpeechTranscriber, OpenAIWhisperTranscriber, RemoteWhisperTranscriber, WhisperTranscriber
+"""
+
+# 이제부터 바뀐 위치
+from app.consult.stt.api.schema.schema import ALLOWED_EXTENSIONS, TranscribeResponse
+from app.consult.stt.core.config import stt_config
+from app.consult.stt.core.transcriber import ClovaSpeechTranscriber, OpenAIWhisperTranscriber, RemoteWhisperTranscriber, WhisperTranscriber
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/stt", tags=["stt"])
 
-transcriber = None
-
-
-def _get_transcriber():
-    global transcriber
-    if transcriber is not None:
-        return transcriber
-    logger.info("Transcriber 타입: %s", stt_config.transcriber_type)
-    if stt_config.transcriber_type == "openai":
-        transcriber = OpenAIWhisperTranscriber(
-            api_key=stt_config.openai_api_key,
-            language=stt_config.language,
-        )
-    elif stt_config.transcriber_type == "clova":
-        transcriber = ClovaSpeechTranscriber(
-            invoke_url=stt_config.clova_invoke_url,
-            secret_key=stt_config.clova_secret_key,
-            speaker_count_min=stt_config.clova_speaker_count_min,
-            speaker_count_max=stt_config.clova_speaker_count_max,
-        )
-    elif stt_config.transcriber_type == "remote":
-        transcriber = RemoteWhisperTranscriber(
-            server_url=stt_config.whisper_server_url,
-            language=stt_config.language,
-        )
-    else:  # "local" (default)
-        transcriber = WhisperTranscriber(
-            model_size=stt_config.model_size,
-            language=stt_config.language,
-            device=stt_config.device,
-            compute_type=stt_config.compute_type,
-        )
-    return transcriber
+logger.info("Transcriber 타입: %s", stt_config.transcriber_type)
+if stt_config.transcriber_type == "openai":
+    transcriber = OpenAIWhisperTranscriber(
+        api_key=stt_config.openai_api_key,
+        language=stt_config.language,
+    )
+elif stt_config.transcriber_type == "clova":
+    transcriber = ClovaSpeechTranscriber(
+        invoke_url=stt_config.clova_invoke_url,
+        secret_key=stt_config.clova_secret_key,
+        speaker_count_min=stt_config.clova_speaker_count_min,
+        speaker_count_max=stt_config.clova_speaker_count_max,
+    )
+elif stt_config.transcriber_type == "remote":
+    transcriber = RemoteWhisperTranscriber(
+        server_url=stt_config.whisper_server_url,
+        language=stt_config.language,
+    )
+else:  # "local" (default)
+    transcriber = WhisperTranscriber(
+        model_size=stt_config.model_size,
+        language=stt_config.language,
+        device=stt_config.device,
+        compute_type=stt_config.compute_type,
+    )
 
 
 @router.post("/transcribe", response_model=TranscribeResponse)
@@ -75,8 +76,7 @@ async def transcribe_audio(file: UploadFile):
         tmp.write(contents)
         tmp.close()
         logger.info("임시 파일 저장 완료: %s", tmp.name)
-        worker = _get_transcriber()
-        result = worker.transcribe(tmp.name)
+        result = transcriber.transcribe(tmp.name)
     except Exception as e:
         logger.error("전사 실패: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="전사 중 오류가 발생했습니다")

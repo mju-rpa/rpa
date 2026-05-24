@@ -3,15 +3,26 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile
 
-from app.ocr.schema.models import ALLOWED_EXTENSIONS, OcrResponse
+# Directory 정리하면서 import 위치가 변경되었습니다.
+# 아래는 기존 위치
+"""
+from app.ocr.api.schemas import ALLOWED_EXTENSIONS, OcrResponse
 from app.ocr.core.config import ocr_config
 from app.ocr.core.extractor import GeminiExtractor
+"""
+
+# 이제부터 바뀐 위치
+from app.consult.ocr.api.schema.schema import ALLOWED_EXTENSIONS, OcrResponse
+from app.consult.ocr.core.config import ocr_config
+from app.consult.ocr.core.extractor import GeminiExtractor
+
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ocr", tags=["ocr"])
 
-extractor: GeminiExtractor | None = None
+logger.info("GeminiExtractor 초기화 중 (model=%s)", ocr_config.gemini_model)
+extractor = GeminiExtractor(api_key=ocr_config.gemini_api_key, model=ocr_config.gemini_model)
 
 _MIME_MAP = {
     ".jpg": "image/jpeg",
@@ -26,7 +37,6 @@ _MIME_MAP = {
 @router.post("/extract", response_model=OcrResponse)
 async def extract_medicine(file: UploadFile):
     logger.info("요청 수신 - 파일명: %s", file.filename)
-    global extractor
 
     if not file.filename:
         raise HTTPException(status_code=400, detail="파일명이 필요합니다")
@@ -43,18 +53,6 @@ async def extract_medicine(file: UploadFile):
         raise HTTPException(status_code=413, detail="파일 크기가 20MB를 초과합니다")
 
     try:
-        if extractor is None:
-            logger.info("GeminiExtractor 초기화 중 (model=%s)", ocr_config.gemini_model)
-            try:
-                extractor = GeminiExtractor(
-                    api_key=ocr_config.gemini_api_key,
-                    model=ocr_config.gemini_model,
-                )
-            except Exception:
-                raise HTTPException(
-                    status_code=503,
-                    detail="OCR 초기화 실패: GEMINI_API_KEY 또는 OCR 설정을 확인해주세요",
-                )
         result = extractor.extract(contents, _MIME_MAP[ext])
     except Exception as e:
         logger.error("OCR 실패: %s", e, exc_info=True)

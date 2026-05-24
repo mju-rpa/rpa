@@ -2,7 +2,9 @@ import json
 import logging
 from abc import ABC, abstractmethod
 
-from app.ocr.schema.models import Medicine, OcrResponse
+# from app.ocr.api.schemas import Medicine, OcrResponse 기존 코드.
+# Directory 정리하면서 import 위치가 변경되었습니다.
+from app.consult.ocr.api.schema.schema import  Medicine, OcrResponse # 수정된 위치
 
 logger = logging.getLogger(__name__)
 

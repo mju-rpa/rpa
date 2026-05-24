@@ -1,6 +1,10 @@
 from abc import ABC, abstractmethod
-from app.stt.core.transcriber import TranscriptionResult  # noqa: F401 — agent 확장용
 
+# 기존 위치
+# from app.stt.core.transcriber import TranscriptionResult
+
+# 변경된 위치는 아래와 같습니다.
+from app.consult.stt.core.transcriber import TranscriptionResult
 
 class BaseAgent(ABC):
     """STT 텍스트를 받아 후처리하는 에이전트 베이스."""

@@ -1,5 +1,26 @@
 # 로그: Render 수집 + 로컬 PC 테스트
 
+## 팀 시연 (권장): 개인 PC 실행 + Render Logs 한곳에
+
+Render `/docs`만 쓰면 `output/` 파일을 PC에서 못 보고, `high_risk`는 예전에 리포트 필드가 없었습니다.  
+**각자 로컬 uvicorn + 아래 `.env`** 가 정답입니다.
+
+| 하는 일 | 어디서 |
+|--------|--------|
+| API 실행·Swagger Try it out | `http://localhost:8000/docs` |
+| workflow 로그 모음 | Render 대시보드 → **Logs** (`[forwarded] host=팀원PC`) |
+| 복약 리포트 | 응답 JSON `report_text` + 프로젝트 `output/*.txt` |
+
+```env
+RENDER_SERVICE_URL=https://mju-rpa.onrender.com
+RENDER_LOG_FORWARD_ENABLED=true
+RENDER_LOG_INGEST_KEY=팀공유시크릿
+```
+
+Render **Environment**에도 동일 `RENDER_LOG_INGEST_KEY`. 확인: `.\script\run_team_demo.ps1`
+
+---
+
 ## 어디에 무엇을 넣나요? (.env)
 
 | 변수 | 넣을 값 (Render 대시보드) |

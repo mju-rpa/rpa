@@ -2,6 +2,7 @@ from pathlib import Path
 
 from app.agentic_ai.schema.models import AnalyzeRequest
 from app.log.workflow_log import workflow_log
+from app.rpa.python.report import format_report, save_report_file
 from app.workflow.step01_collect_convert import collect_convert
 from app.workflow.step02_agentic_analyze_reflect_score import agentic_analyze_reflect_score
 from app.workflow.step03_hidl_human_gate import hidl_human_gate
@@ -44,6 +45,13 @@ def run_pipeline(req: AnalyzeRequest, output_dir: Path) -> dict:
                 "step03",
                 f"hidl blocked status={decision.status} | {decision.message}",
             )
+            report_text = format_report(analysis, risk)
+            report_path = save_report_file(analysis, report_text, output_dir)
+            workflow_log(
+                "SUCCESS",
+                "step04",
+                f"hidl pending — draft report saved {report_path.name}",
+            )
             agent_trace = build_agent_trace(
                 stt,
                 ocr,
@@ -67,6 +75,9 @@ def run_pipeline(req: AnalyzeRequest, output_dir: Path) -> dict:
                 "patient_name": analysis.get("환자명", ""),
                 "final_score": risk["최종점수"],
                 "needs_review": risk["재검토_필요"],
+                "report_text": report_text,
+                "report_file": str(report_path),
+                "report_note": "HIDL 승인 대기 — 초안 리포트(알림·RPA는 보류)",
             }
 
         if decision.status in ("pending", "rejected"):

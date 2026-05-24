@@ -21,6 +21,8 @@ def root():
             "analyze": "POST /analyze",
             "analyze_file": "POST /analyze/file",
             "demo_pipeline": "POST /demo/pipeline?sample=normal|high_risk",
+            "demo1_collect": "POST /demo1/collect?sample=normal|high_risk (consult→agentic 인계 비교)",
+            "demo1_pipeline": "POST /demo1/pipeline?sample=normal|high_risk&run_agentic=true",
             "input_process": "POST /input-process (STT+OCR 병렬 → AnalyzeRequest)",
             "sample": "GET /sample-input",
             "ocr": "POST /ocr/extract",

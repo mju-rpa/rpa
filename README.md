@@ -30,7 +30,16 @@ uvicorn app.main:app --reload --port 8000
 
 
 
-로컬 로그를 Render로 모으려면 `dev_doc/logging-render.md`, Render/CI 변수는 `deploy/env.render.example`.
+### 팀원: 개인 PC에서 실행 + Render Logs + 리포트
+
+1. `cp .env.example .env` — `RENDER_SERVICE_URL`, `RENDER_LOG_FORWARD_ENABLED=true`, `RENDER_LOG_INGEST_KEY` 입력  
+2. Render 대시보드 **Environment**에 같은 `RENDER_LOG_INGEST_KEY` 등록  
+3. 로컬: `uvicorn app.main:app --reload --port 8000` → Swagger는 **http://localhost:8000/docs** (Render `/docs` 아님)  
+4. `POST /demo/pipeline` 실행 → 로그는 Render **Logs** (`[forwarded] host=...`), 리포트는 응답 `report_text` + `output/` 폴더  
+
+한 번에: `.\script\run_team_demo.ps1`  
+
+상세: `dev_doc/logging-render.md`
 
 
 
