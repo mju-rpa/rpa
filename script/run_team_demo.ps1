@@ -1,12 +1,11 @@
-# UiPath + Agentic AI 팀 데모 (한 번에 실행)
-# 사용: demo 폴더에서  .\scripts\run_team_demo.ps1
+# 팀 데모: FastAPI 기동 후 샘플 파이프라인 2회 호출
+# 사용: .\script\run_team_demo.ps1
 
 $ErrorActionPreference = "Stop"
 $DemoRoot = Split-Path $PSScriptRoot -Parent
 Set-Location $DemoRoot
 
 Write-Host "`n=== Atlas Medical Team Demo ===" -ForegroundColor Cyan
-Write-Host "Folder: $DemoRoot`n"
 
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
     Write-Host "[ERROR] Python not found. Install Python 3.10+" -ForegroundColor Red
@@ -14,23 +13,25 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
 }
 
 $env:PYTHONIOENCODING = "utf-8"
-
 if (-not (Test-Path ".venv")) {
-    Write-Host "[1/3] Creating venv..." -ForegroundColor Yellow
     python -m venv .venv
 }
-
-Write-Host "[2/3] Installing packages..." -ForegroundColor Yellow
 & .\.venv\Scripts\python.exe -m pip install -q -r requirements.txt
 
-Write-Host "[3/3] Running pipeline (normal case)..." -ForegroundColor Yellow
-& .\.venv\Scripts\python.exe run_standalone.py
+$port = 8000
+$base = "http://127.0.0.1:$port"
+$uvicorn = Start-Process -FilePath ".\.venv\Scripts\python.exe" `
+    -ArgumentList "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", $port `
+    -PassThru -WindowStyle Hidden
 
-Write-Host "`n--- High risk sample (UiPath If branch: 재검토_필요=True) ---" -ForegroundColor Magenta
-& .\.venv\Scripts\python.exe run_high_risk_demo.py
-
-Write-Host "`n=== Next: API server for UiPath ===" -ForegroundColor Green
-Write-Host "  .\.venv\Scripts\Activate.ps1"
-Write-Host "  uvicorn app.main:app --reload --port 8000"
-Write-Host "  Swagger: http://localhost:8000/docs"
-Write-Host "  UiPath HTTP POST -> http://localhost:8000/analyze`n"
+try {
+    Start-Sleep -Seconds 4
+    Write-Host "[1/2] POST /demo/pipeline?sample=normal" -ForegroundColor Yellow
+    Invoke-RestMethod -Method Post -Uri "$base/demo/pipeline?sample=normal" | Out-Null
+    Write-Host "[2/2] POST /demo/pipeline?sample=high_risk (HIDL)" -ForegroundColor Magenta
+    Invoke-RestMethod -Method Post -Uri "$base/demo/pipeline?sample=high_risk" | Out-Null
+    Write-Host "`n[OK] Check terminal/Render Logs for [SUCCESS] / [ADMIN] lines" -ForegroundColor Green
+    Write-Host "Swagger: $base/docs`n"
+} finally {
+    Stop-Process -Id $uvicorn.Id -Force -ErrorAction SilentlyContinue
+}

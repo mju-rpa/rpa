@@ -11,8 +11,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ocr", tags=["ocr"])
 
-logger.info("GeminiExtractor 초기화 중 (model=%s)", ocr_config.gemini_model)
-extractor = GeminiExtractor(api_key=ocr_config.gemini_api_key, model=ocr_config.gemini_model)
+extractor: GeminiExtractor | None = None
 
 _MIME_MAP = {
     ".jpg": "image/jpeg",
@@ -27,6 +26,7 @@ _MIME_MAP = {
 @router.post("/extract", response_model=OcrResponse)
 async def extract_medicine(file: UploadFile):
     logger.info("요청 수신 - 파일명: %s", file.filename)
+    global extractor
 
     if not file.filename:
         raise HTTPException(status_code=400, detail="파일명이 필요합니다")
@@ -43,6 +43,18 @@ async def extract_medicine(file: UploadFile):
         raise HTTPException(status_code=413, detail="파일 크기가 20MB를 초과합니다")
 
     try:
+        if extractor is None:
+            logger.info("GeminiExtractor 초기화 중 (model=%s)", ocr_config.gemini_model)
+            try:
+                extractor = GeminiExtractor(
+                    api_key=ocr_config.gemini_api_key,
+                    model=ocr_config.gemini_model,
+                )
+            except Exception:
+                raise HTTPException(
+                    status_code=503,
+                    detail="OCR 초기화 실패: GEMINI_API_KEY 또는 OCR 설정을 확인해주세요",
+                )
         result = extractor.extract(contents, _MIME_MAP[ext])
     except Exception as e:
         logger.error("OCR 실패: %s", e, exc_info=True)

@@ -20,6 +20,7 @@ print(f"[startup] TRANSCRIBER_TYPE={os.getenv('TRANSCRIBER_TYPE')}", flush=True)
 from fastapi import FastAPI
 
 from app.route.analyze import router as analyze_router
+from app.route.demo import router as demo_router
 from app.route.health import router as health_router
 from app.route.input_process import router as input_process_router
 from app.route.log_ingest import router as log_ingest_router
@@ -34,7 +35,14 @@ app = FastAPI(
 
 app.include_router(health_router)
 app.include_router(analyze_router)
+app.include_router(demo_router)
 app.include_router(input_process_router)
 app.include_router(log_ingest_router)
 app.include_router(ocr_router)
 app.include_router(stt_router)
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

@@ -20,6 +20,7 @@ def root():
             "health": "/health",
             "analyze": "POST /analyze",
             "analyze_file": "POST /analyze/file",
+            "demo_pipeline": "POST /demo/pipeline?sample=normal|high_risk",
             "input_process": "POST /input-process (STT+OCR 병렬 → AnalyzeRequest)",
             "sample": "GET /sample-input",
             "ocr": "POST /ocr/extract",

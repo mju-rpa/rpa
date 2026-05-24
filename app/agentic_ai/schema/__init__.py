@@ -9,6 +9,7 @@ from app.agentic_ai.schema.models import (
     ScoreDetail,
 )
 
+# Notion에 있던 Task들
 __all__ = [
     "AnalyzeRequest",
     "AnalyzeResponse",

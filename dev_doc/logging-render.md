@@ -32,7 +32,7 @@
    RENDER_LOG_FORWARD_ENABLED=true
    RENDER_LOG_INGEST_KEY=팀공유시크릿
    ```
-3. `python run_standalone.py` 또는 로컬 `uvicorn`
+3. 로컬 `uvicorn app.main:app` + `POST /demo/pipeline` 또는 `/analyze`
 4. 로그가 `POST {RENDER_SERVICE_URL}/log/ingest` 로 전송
 5. Render **Logs**에서 `[forwarded] host=팀원PC ...` 확인
 

@@ -36,8 +36,8 @@
 ├── dev_doc/
 ├── api_doc/
 ├── .env.example
-├── Procfile
-└── run_standalone.py
+├── deploy/env.render.example
+└── Procfile
 ```
 
 ---
@@ -100,7 +100,7 @@
 ```python
 from app.workflow.run_pipeline import run_pipeline
 from app.agentic_ai.schema.models import AnalyzeRequest
-from app.consult_alias import register_consult_import_alias  # main/standalone 최상단
+from app.consult_alias import register_consult_import_alias  # app/main.py 최상단
 ```
 
 ---

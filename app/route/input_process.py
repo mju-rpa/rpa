@@ -30,10 +30,7 @@ router = APIRouter(prefix="/input-process", tags=["input-process"])
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 OUTPUT_DIR = BASE_DIR / "output" / "input_process"
 
-_ocr_extractor = GeminiExtractor(
-    api_key=ocr_config.gemini_api_key,
-    model=ocr_config.gemini_model,
-)
+_ocr_extractor: GeminiExtractor | None = None
 
 _MIME_MAP = {
     ".jpg": "image/jpeg",
@@ -44,30 +41,48 @@ _MIME_MAP = {
     ".heif": "image/heif",
 }
 
-if stt_config.transcriber_type == "openai":
-    _stt_transcriber = OpenAIWhisperTranscriber(
-        api_key=stt_config.openai_api_key,
-        language=stt_config.language,
-    )
-elif stt_config.transcriber_type == "clova":
-    _stt_transcriber = ClovaSpeechTranscriber(
-        invoke_url=stt_config.clova_invoke_url,
-        secret_key=stt_config.clova_secret_key,
-        speaker_count_min=stt_config.clova_speaker_count_min,
-        speaker_count_max=stt_config.clova_speaker_count_max,
-    )
-elif stt_config.transcriber_type == "remote":
-    _stt_transcriber = RemoteWhisperTranscriber(
-        server_url=stt_config.whisper_server_url,
-        language=stt_config.language,
-    )
-else:
-    _stt_transcriber = WhisperTranscriber(
-        model_size=stt_config.model_size,
-        language=stt_config.language,
-        device=stt_config.device,
-        compute_type=stt_config.compute_type,
-    )
+_stt_transcriber = None
+
+
+def _get_stt_transcriber():
+    global _stt_transcriber
+    if _stt_transcriber is not None:
+        return _stt_transcriber
+    if stt_config.transcriber_type == "openai":
+        _stt_transcriber = OpenAIWhisperTranscriber(
+            api_key=stt_config.openai_api_key,
+            language=stt_config.language,
+        )
+    elif stt_config.transcriber_type == "clova":
+        _stt_transcriber = ClovaSpeechTranscriber(
+            invoke_url=stt_config.clova_invoke_url,
+            secret_key=stt_config.clova_secret_key,
+            speaker_count_min=stt_config.clova_speaker_count_min,
+            speaker_count_max=stt_config.clova_speaker_count_max,
+        )
+    elif stt_config.transcriber_type == "remote":
+        _stt_transcriber = RemoteWhisperTranscriber(
+            server_url=stt_config.whisper_server_url,
+            language=stt_config.language,
+        )
+    else:
+        _stt_transcriber = WhisperTranscriber(
+            model_size=stt_config.model_size,
+            language=stt_config.language,
+            device=stt_config.device,
+            compute_type=stt_config.compute_type,
+        )
+    return _stt_transcriber
+
+
+def _get_ocr_extractor() -> GeminiExtractor:
+    global _ocr_extractor
+    if _ocr_extractor is None:
+        _ocr_extractor = GeminiExtractor(
+            api_key=ocr_config.gemini_api_key,
+            model=ocr_config.gemini_model,
+        )
+    return _ocr_extractor
 
 
 def _ocr_to_text(result) -> str:
@@ -106,7 +121,8 @@ async def _run_stt(file: UploadFile) -> str:
     try:
         tmp.write(contents)
         tmp.close()
-        result = await asyncio.to_thread(_stt_transcriber.transcribe, tmp.name)
+        transcriber = _get_stt_transcriber()
+        result = await asyncio.to_thread(transcriber.transcribe, tmp.name)
     finally:
         os.unlink(tmp.name)
     if result.segments:
@@ -121,7 +137,14 @@ async def _run_ocr(file: UploadFile) -> str:
     contents = await file.read()
     if len(contents) > ocr_config.max_file_size_bytes:
         raise HTTPException(status_code=413, detail="OCR: 파일 크기 초과")
-    result = await asyncio.to_thread(_ocr_extractor.extract, contents, _MIME_MAP[ext])
+    try:
+        extractor = _get_ocr_extractor()
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail="OCR 초기화 실패: GEMINI_API_KEY 또는 OCR 설정을 확인해주세요",
+        )
+    result = await asyncio.to_thread(extractor.extract, contents, _MIME_MAP[ext])
     return _ocr_to_text(result)
 
 
