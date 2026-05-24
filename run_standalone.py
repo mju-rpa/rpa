@@ -1,43 +1,43 @@
 """
-UiPath 없이 터미널에서만 데모 실행.
-API 서버와 동일한 pipeline 사용.
+UiPath 없이 터미널 데모. workflow.run_pipeline 과 동일.
 """
 import json
 from pathlib import Path
 
-from app.pipeline import run_pipeline
-from app.schemas import AnalyzeRequest
+from app.consult_alias import register_consult_import_alias
 
-SAMPLE = Path(__file__).parent / "data" / "sample_input.json"
+register_consult_import_alias()
+
+from app.agentic_ai.schema.models import AnalyzeRequest
+from app.log.configure import setup_logging
+from app.workflow.run_pipeline import run_pipeline
+
+setup_logging()
+
+SAMPLE = Path(__file__).parent / "input" / "sample_input.json"
 
 
 def main():
     data = json.loads(SAMPLE.read_text(encoding="utf-8"))
     req = AnalyzeRequest(**data)
     print("=" * 50)
-    print("[Step 1] RPA collect - STT/OCR (to_be_generated, now: sample_input.json)")
-    print("[Step 2] Agentic AI analyze + Self-Reflection")
-    print("[Step 3] Risk score + notification plan")
-    print("[Step 4] RPA report file")
+    print("[step01] collect_convert (input/sample_input.json)")
+    print("[step02] agentic + reflection + score")
+    print("[step03] hidl (default off)")
+    print("[step04] rpa + notification")
     print("=" * 50)
 
     result = run_pipeline(req, Path(__file__).parent / "output")
-    print(result["report_text"])
-    print("\n--- Agent Trace (show this to team) ---")
+    print(result.get("report_text", ""))
+    print("\n--- Agent Trace ---")
     for t in result.get("agent_trace", []):
         rev = " [REVISED]" if t.get("revised") else ""
         print(f"  Step {t['step']} | {t['agent']}{rev}")
         print(f"           {t['action']}")
-        print(f"           -> {t.get('detail', '')}")
-    print("\n--- Reflection ---")
-    for log in result["reflection_logs"]:
-        print(f"  Round {log['round']}: {log['critic_feedback']} (수정: {log['revised']})")
     print("\n--- Risk Score ---")
-    print(json.dumps(result["risk_score"], ensure_ascii=False, indent=2))
-    print("\n--- RPA Actions ---")
-    for action in result["rpa_actions"]:
-        print(f"  {action}")
-    print(f"\n[OK] saved: {result['report_file']}")
+    print(json.dumps(result.get("risk_score", {}), ensure_ascii=False, indent=2))
+    if result.get("report_file"):
+        print(f"\n[OK] saved: {result['report_file']}")
 
 
 if __name__ == "__main__":
