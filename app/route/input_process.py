@@ -11,17 +11,17 @@ from fastapi import APIRouter, Form, HTTPException, UploadFile
 from fastapi.params import File
 
 from app.agentic_ai.schema.models import AnalyzeRequest
-from app.ocr.core.config import ocr_config
-from app.ocr.core.extractor import GeminiExtractor
-from app.ocr.schema.models import ALLOWED_EXTENSIONS as OCR_EXTENSIONS
-from app.stt.core.config import stt_config
-from app.stt.core.transcriber import (
+from app.consult.ocr.core.config import ocr_config
+from app.consult.ocr.core.extractor import GeminiExtractor
+from app.consult.ocr.api.schema.schema import ALLOWED_EXTENSIONS as OCR_EXTENSIONS
+from app.consult.stt.core.config import stt_config
+from app.consult.stt.core.transcriber import (
     ClovaSpeechTranscriber,
     OpenAIWhisperTranscriber,
     RemoteWhisperTranscriber,
     WhisperTranscriber,
 )
-from app.stt.schema.models import ALLOWED_EXTENSIONS as STT_EXTENSIONS
+from app.consult.stt.api.schema.schema import ALLOWED_EXTENSIONS as STT_EXTENSIONS
 
 logger = logging.getLogger(__name__)
 

@@ -19,7 +19,7 @@ from app.consult.ocr.core.extractor import GeminiExtractor
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/ocr", tags=["ocr"])
+router = APIRouter(prefix="/ocr", tags=["ocr (개별 테스트 용도)"])
 
 logger.info("GeminiExtractor 초기화 중 (model=%s)", ocr_config.gemini_model)
 extractor = GeminiExtractor(api_key=ocr_config.gemini_api_key, model=ocr_config.gemini_model)

@@ -20,7 +20,7 @@ from app.consult.stt.core.transcriber import ClovaSpeechTranscriber, OpenAIWhisp
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/stt", tags=["stt"])
+router = APIRouter(prefix="/stt", tags=["stt (개별 테스트 용도)"])
 
 logger.info("Transcriber 타입: %s", stt_config.transcriber_type)
 if stt_config.transcriber_type == "openai":
