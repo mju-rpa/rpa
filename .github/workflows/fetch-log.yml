@@ -1,0 +1,31 @@
+# Render 로그 스냅샷 + keep-alive (14분)
+# GitHub Secrets: RENDER_OWNER_ID, RENDER_SERVICE_ID, RENDER_API_KEY
+
+name: Auto Fetch Render Logs and Keep Alive
+
+on:
+  schedule:
+    - cron: '*/14 * * * *'
+  workflow_dispatch:
+
+jobs:
+  fetch-log:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Fetch Logs from Render
+        run: |
+          mkdir -p log
+          curl -s -X GET "https://api.render.com/v1/logs?ownerId=${{ secrets.RENDER_OWNER_ID }}&resource=${{ secrets.RENDER_SERVICE_ID }}" \
+               -H "Accept: application/json" \
+               -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" > log/render_fetch_snapshot.json
+
+      - name: Commit and Push if changed
+        run: |
+          git config --global user.name "Log-Bot"
+          git config --global user.email "bot@github.com"
+          git add log/render_fetch_snapshot.json
+          git commit -m "chore: update render log snapshot and keep alive [skip ci]" || exit 0
+          git push
