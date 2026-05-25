@@ -1,0 +1,22 @@
+{
+  "patient_name": "김철수",
+  "prescribed_date": "2026-05-20",
+  "hospital_name": null,
+  "medicines": [
+    {
+      "name": "넥시움정 (위산억제제)",
+      "dosage": null,
+      "frequency": "1일 1회",
+      "timing": "식전 30분",
+      "caution": "7일분"
+    },
+    {
+      "name": "타이레놀정 (진통제)",
+      "dosage": "1정",
+      "frequency": null,
+      "timing": "증상 발현 시",
+      "caution": "최대 1일 3회"
+    }
+  ],
+  "general_caution": null
+}
