@@ -15,6 +15,7 @@ def run_pipeline(req: AnalyzeRequest, output_dir: Path) -> dict:
     """
     patient = req.환자명 or req.patient_id or "unknown"
     try:
+        # ── step01: STT + OCR 수집 ────────────────────
         workflow_log("SUCCESS", "step01", f"collect_convert start patient={patient}")
         converted = collect_convert(req)
         stt = converted["stt_text"]
@@ -25,17 +26,22 @@ def run_pipeline(req: AnalyzeRequest, output_dir: Path) -> dict:
             f"collect_convert done stt={len(stt)}chars ocr={len(ocr)}chars",
         )
 
+        # ── step02: Agentic AI 분석 ───────────────────
+        # 변경: req.알림매체 파라미터 추가 (ActionPlanner가 알림 계획 수립에 사용)
         workflow_log("SUCCESS", "step02", "agentic analyze + reflection + score start")
-        agentic = agentic_analyze_reflect_score(stt, ocr, req.환자명)
-        analysis = agentic["analysis"]
+        agentic = agentic_analyze_reflect_score(stt, ocr, req.환자명, req.알림매체)
+        analysis       = agentic["analysis"]
         reflection_logs = agentic["reflection_logs"]
-        risk = agentic["risk"]
+        risk           = agentic["risk"]
+        action_plan    = agentic.get("action_plan", {})  # CrewAI ActionPlanner 결과
         workflow_log(
             "SUCCESS",
             "step02",
-            f"agentic done score={risk['최종점수']} needs_review={risk['재검토_필요']}",
+            f"agentic done score={risk['최종점수']} needs_review={risk['재검토_필요']} "
+            f"use_mock={agentic.get('use_mock', True)}",
         )
 
+        # ── step03: HIDL 게이트 ───────────────────────
         workflow_log("SUCCESS", "step03", "hidl gate start")
         hidl = hidl_human_gate(req, analysis, risk)
         decision = hidl["decision"]
@@ -71,6 +77,7 @@ def run_pipeline(req: AnalyzeRequest, output_dir: Path) -> dict:
                 "analysis": analysis,
                 "risk_score": risk,
                 "reflection_logs": reflection_logs,
+                "action_plan": action_plan,
                 "agent_trace": agent_trace,
                 "patient_name": analysis.get("환자명", ""),
                 "final_score": risk["최종점수"],
@@ -85,6 +92,7 @@ def run_pipeline(req: AnalyzeRequest, output_dir: Path) -> dict:
         else:
             workflow_log("SUCCESS", "step03", f"hidl {decision.status}")
 
+        # ── step04: RPA 알림 + 보고서 ─────────────────
         workflow_log("SUCCESS", "step04", "rpa notify + report start")
         result = rpa_notify_output(
             req,
@@ -102,7 +110,11 @@ def run_pipeline(req: AnalyzeRequest, output_dir: Path) -> dict:
             "step04",
             f"completed report={result.get('report_file', '')}",
         )
+
+        # action_plan을 최종 결과에 포함
+        result["action_plan"] = action_plan
         return result
+
     except Exception as exc:
         workflow_log("ERROR", "pipeline", f"patient={patient} | {exc!s}")
         raise
