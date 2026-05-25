@@ -18,6 +18,8 @@ class RenderForwardHandler(logging.Handler):
         self.ingest_key = os.getenv("RENDER_LOG_INGEST_KEY", "").strip()
 
     def emit(self, record: logging.LogRecord) -> None:
+        # ★ [로그가 Render로 날아가는 부분] workflow_log / demo1_log 등이 여기까지 전달되면
+        # POST {RENDER_SERVICE_URL}/log/ingest 로 JSON 전송 → Render 대시보드 Logs 탭에 표시
         try:
             payload = {
                 "service": self.service_name,

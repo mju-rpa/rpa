@@ -30,6 +30,7 @@ def setup_logging(service_name: str = "atlas-medical") -> None:
     forward_url = os.getenv("RENDER_SERVICE_URL", "").strip().rstrip("/")
     if os.getenv("RENDER_LOG_FORWARD_ENABLED", "").lower() in ("1", "true", "yes"):
         if forward_url:
+            # ★ [로그가 Render로 날아가도록 핸들러 등록] 이후 demo1_log/workflow_log → render_forward.emit
             root.addHandler(RenderForwardHandler(forward_url, service_name))
         else:
             print(
