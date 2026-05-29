@@ -25,6 +25,8 @@ _MODULE_MAP: dict[str, str] = {
     "app.stt.route.router": "app.consult.stt.api.route.router",
     "app.stt.agents": "app.consult.stt.agents",
     "app.stt.agents.base_agent": "app.consult.stt.agents.base_agent",
+    "app.ocr.service": "app.consult.ocr.service",
+    "app.stt.service": "app.consult.stt.service",
 }
 
 
