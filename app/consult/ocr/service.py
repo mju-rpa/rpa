@@ -4,9 +4,10 @@ from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
 
-from app.consult.ocr.api.schema.schema import ALLOWED_EXTENSIONS, OcrResponse
+from app.consult.ocr.api.schema.schema import ALLOWED_EXTENSIONS, OcrPipelineResult, OcrResponse
 from app.consult.ocr.core.config import ocr_config
 from app.consult.ocr.core.extractor import GeminiExtractor
+from app.consult.ocr.core.pipeline import OCRPipeline
 
 logger = logging.getLogger(__name__)
 
@@ -19,17 +20,22 @@ _MIME_MAP = {
     ".heif": "image/heif",
 }
 
-_extractor: GeminiExtractor | None = None
+_pipeline: OCRPipeline | None = None
 
 
-def get_extractor() -> GeminiExtractor:
-    global _extractor
-    if _extractor is None:
-        _extractor = GeminiExtractor(
+def get_pipeline() -> OCRPipeline:
+    global _pipeline
+    if _pipeline is None:
+        extractor = GeminiExtractor(
             api_key=ocr_config.gemini_api_key,
             model=ocr_config.gemini_model,
         )
-    return _extractor
+        _pipeline = OCRPipeline(
+            extractor=extractor,
+            retry_threshold=ocr_config.retry_threshold,
+            hitl_threshold=ocr_config.hitl_threshold,
+        )
+    return _pipeline
 
 
 def to_text(result: OcrResponse) -> str:
@@ -62,19 +68,29 @@ def validate_file(filename: str, size: int) -> str:
     return ext
 
 
-async def extract_from_upload(file: UploadFile) -> OcrResponse:
+async def run_pipeline(file: UploadFile) -> OcrPipelineResult:
     contents = await file.read()
     ext = validate_file(file.filename, len(contents))
     try:
-        extractor = get_extractor()
+        pipeline = get_pipeline()
     except Exception:
         raise HTTPException(
             status_code=503,
             detail="OCR 초기화 실패: GEMINI_API_KEY 또는 OCR 설정을 확인해주세요",
         )
-    result = await asyncio.to_thread(extractor.extract, contents, _MIME_MAP[ext])
-    logger.info("OCR 성공 - 환자: %s, 약품 수: %d", result.patient_name, len(result.medicines))
+    result = await asyncio.to_thread(pipeline.run, contents, _MIME_MAP[ext])
+    logger.info(
+        "OCR 완료 - 환자: %s, 약품 수: %d, 상태: %s, 신뢰도: %.2f",
+        result.data.patient_name, len(result.data.medicines),
+        result.status, result.confidence.final,
+    )
     return result
+
+
+async def extract_from_upload(file: UploadFile) -> OcrResponse:
+    """기존 호환성 — OcrResponse만 필요한 호출처에서 사용."""
+    pipeline_result = await run_pipeline(file)
+    return pipeline_result.data
 
 
 async def extract_text_from_upload(file: UploadFile) -> str:
