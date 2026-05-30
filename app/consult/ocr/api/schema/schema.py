@@ -1,3 +1,6 @@
+from dataclasses import dataclass, field as dc_field
+from typing import Literal
+
 from pydantic import BaseModel, field_validator
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
@@ -24,3 +27,19 @@ class OcrResponse(BaseModel):
     hospital_name: str | None = None
     medicines: list[Medicine] = []
     general_caution: str | None = None
+
+
+@dataclass
+class ConfidenceResult:
+    llm_score: float
+    rule_score: float
+    final: float
+    low_fields: list[str] = dc_field(default_factory=list)
+
+
+@dataclass
+class OcrPipelineResult:
+    status: Literal["ok", "hitl_required"]
+    data: OcrResponse
+    confidence: ConfidenceResult
+    retried: bool
