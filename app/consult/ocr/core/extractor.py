@@ -2,9 +2,7 @@ import json
 import logging
 from abc import ABC, abstractmethod
 
-# from app.ocr.api.schemas import Medicine, OcrResponse 기존 코드.
-# Directory 정리하면서 import 위치가 변경되었습니다.
-from app.consult.ocr.api.schema.schema import  Medicine, OcrResponse # 수정된 위치
+from app.consult.ocr.api.schema.schema import ConfidenceResult, Medicine, OcrResponse
 
 logger = logging.getLogger(__name__)
 
@@ -15,25 +13,82 @@ _PROMPT = """
 스키마:
 {
   "patient_name": "환자 이름 (없으면 null)",
+  "patient_name_confidence": 0.0,
   "prescribed_date": "처방일 YYYY-MM-DD 형식 (없으면 null)",
+  "prescribed_date_confidence": 0.0,
   "hospital_name": "병원/약국명 (없으면 null)",
+  "hospital_name_confidence": 0.0,
   "medicines": [
     {
       "name": "약품명",
+      "name_confidence": 0.0,
       "dosage": "1회 복용량 (없으면 null)",
+      "dosage_confidence": 0.0,
       "frequency": "1일 복용 횟수 (없으면 null)",
+      "frequency_confidence": 0.0,
       "timing": "복용 시기 예: 식후 30분 (없으면 null)",
-      "caution": "해당 약 주의사항 (없으면 null)"
+      "timing_confidence": 0.0,
+      "caution": "해당 약 주의사항 (없으면 null)",
+      "caution_confidence": 0.0
     }
   ],
-  "general_caution": "전체 공통 주의사항 (없으면 null)"
+  "general_caution": "전체 공통 주의사항 (없으면 null)",
+  "general_caution_confidence": 0.0
 }
+
+confidence 값은 0.0~1.0 사이 숫자로, 해당 필드를 얼마나 확신하는지 나타냅니다.
 """
+
+_PROMPT_RETRY = _PROMPT + """
+\n주의: 이전 시도에서 신뢰도가 낮았습니다. 이미지를 더 주의깊게 읽어주세요.
+불확실한 항목도 최선의 추측값을 기입하고 confidence를 낮게 설정하세요.
+"""
+
+
+def _parse_raw(raw: str) -> tuple[OcrResponse, float]:
+    """JSON 파싱 → (OcrResponse, llm_score)."""
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+
+    data = json.loads(raw)
+
+    confidence_values = []
+    for key in ("patient_name_confidence", "prescribed_date_confidence",
+                "hospital_name_confidence", "general_caution_confidence"):
+        v = data.get(key)
+        if v is not None:
+            confidence_values.append(float(v))
+
+    medicines = []
+    for m in data.get("medicines", []):
+        for mkey in ("name_confidence", "dosage_confidence", "frequency_confidence",
+                     "timing_confidence", "caution_confidence"):
+            v = m.get(mkey)
+            if v is not None:
+                confidence_values.append(float(v))
+        medicines.append(Medicine(
+            name=m.get("name", ""),
+            dosage=m.get("dosage"),
+            frequency=m.get("frequency"),
+            timing=m.get("timing"),
+            caution=m.get("caution"),
+        ))
+
+    llm_score = sum(confidence_values) / len(confidence_values) if confidence_values else 0.5
+
+    result = OcrResponse(
+        patient_name=data.get("patient_name"),
+        prescribed_date=data.get("prescribed_date"),
+        hospital_name=data.get("hospital_name"),
+        medicines=medicines,
+        general_caution=data.get("general_caution"),
+    )
+    return result, llm_score
 
 
 class Extractor(ABC):
     @abstractmethod
-    def extract(self, image_bytes: bytes, mime_type: str) -> OcrResponse:
+    def extract(self, image_bytes: bytes, mime_type: str, retry: bool = False) -> tuple[OcrResponse, float]:
         ...
 
 
@@ -44,33 +99,21 @@ class GeminiExtractor(Extractor):
         self._client = genai.Client(api_key=api_key)
         self._model = model
 
-    def extract(self, image_bytes: bytes, mime_type: str) -> OcrResponse:
-        logger.info("[GeminiExtractor] OCR 시작 - 이미지 크기: %d bytes", len(image_bytes))
+    def extract(self, image_bytes: bytes, mime_type: str, retry: bool = False) -> tuple[OcrResponse, float]:
+        logger.info("[GeminiExtractor] OCR 시작 - 이미지 크기: %d bytes, retry=%s", len(image_bytes), retry)
         from google.genai import types
 
+        prompt = _PROMPT_RETRY if retry else _PROMPT
         response = self._client.models.generate_content(
             model=self._model,
             contents=[
                 types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-                _PROMPT,
+                prompt,
             ],
         )
 
         raw = response.text.strip()
         logger.debug("[GeminiExtractor] 원본 응답: %s", raw)
-
-        # ```json ... ``` 마크다운 블록 제거
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-
-        data = json.loads(raw)
-        medicines = [Medicine(**m) for m in data.get("medicines", [])]
-        result = OcrResponse(
-            patient_name=data.get("patient_name"),
-            prescribed_date=data.get("prescribed_date"),
-            hospital_name=data.get("hospital_name"),
-            medicines=medicines,
-            general_caution=data.get("general_caution"),
-        )
-        logger.info("[GeminiExtractor] OCR 완료 - 약품 수: %d", len(medicines))
-        return result
+        result, llm_score = _parse_raw(raw)
+        logger.info("[GeminiExtractor] OCR 완료 - 약품 수: %d, llm_score: %.2f", len(result.medicines), llm_score)
+        return result, llm_score
