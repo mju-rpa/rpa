@@ -17,6 +17,12 @@ class STTConfig:
     clova_speaker_count_max: int = int(os.getenv("CLOVA_SPEAKER_COUNT_MAX", "2"))
     # "local" | "remote" | "openai" | "clova"
     transcriber_type: str = field(default_factory=lambda: os.getenv("TRANSCRIBER_TYPE", "local"))
+    retry_threshold: float = field(
+        default_factory=lambda: float(os.getenv("STT_RETRY_THRESHOLD", "0.65"))
+    )
+    hitl_threshold: float = field(
+        default_factory=lambda: float(os.getenv("STT_HITL_THRESHOLD", "0.5"))
+    )
 
 
 stt_config = STTConfig()
