@@ -1,5 +1,5 @@
 import logging
-from app.consult.ocr.api.schema.schema import ConfidenceResult, OcrResponse
+from app.consult.ocr.api.schema.schema import ConfidenceResult, DiagnosisResponse, OcrResponse
 
 logger = logging.getLogger(__name__)
 
@@ -44,5 +44,35 @@ class OcrScorer:
             score += 0.1
         else:
             low.append("medicines_count")
+
+        return round(score, 4), low
+
+
+class DiagnosisScorer:
+    def score(self, response: DiagnosisResponse, llm_score: float) -> ConfidenceResult:
+        rule_score, low_fields = self._rule_score(response)
+        final = round(llm_score * 0.5 + rule_score * 0.5, 4)
+        logger.debug("[DiagnosisScorer] llm=%.2f rule=%.2f final=%.2f low=%s",
+                     llm_score, rule_score, final, low_fields)
+        return ConfidenceResult(llm_score=llm_score, rule_score=rule_score, final=final, low_fields=low_fields)
+
+    def _rule_score(self, r: DiagnosisResponse) -> tuple[float, list[str]]:
+        score = 0.0
+        low: list[str] = []
+
+        if r.diagnosis_name:
+            score += 0.5
+        else:
+            low.append("diagnosis_name")
+
+        if r.hospital_name or r.doctor_name:
+            score += 0.3
+        else:
+            low.append("hospital_or_doctor")
+
+        if r.patient_name:
+            score += 0.2
+        else:
+            low.append("patient_name")
 
         return round(score, 4), low

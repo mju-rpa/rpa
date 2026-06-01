@@ -4,10 +4,10 @@ from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
 
-from app.consult.ocr.api.schema.schema import ALLOWED_EXTENSIONS, OcrPipelineResult, OcrResponse
+from app.consult.ocr.api.schema.schema import ALLOWED_EXTENSIONS, DiagnosisPipelineResult, DiagnosisResponse, OcrPipelineResult, OcrResponse
 from app.consult.ocr.core.config import ocr_config
-from app.consult.ocr.core.extractor import GeminiExtractor
-from app.consult.ocr.core.pipeline import OCRPipeline
+from app.consult.ocr.core.extractor import GeminiDiagnosisExtractor, GeminiExtractor
+from app.consult.ocr.core.pipeline import DiagnosisPipeline, OCRPipeline
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,7 @@ _MIME_MAP = {
 }
 
 _pipeline: OCRPipeline | None = None
+_diagnosis_pipeline: DiagnosisPipeline | None = None
 
 
 def get_pipeline() -> OCRPipeline:
@@ -36,6 +37,21 @@ def get_pipeline() -> OCRPipeline:
             hitl_threshold=ocr_config.hitl_threshold,
         )
     return _pipeline
+
+
+def get_diagnosis_pipeline() -> DiagnosisPipeline:
+    global _diagnosis_pipeline
+    if _diagnosis_pipeline is None:
+        extractor = GeminiDiagnosisExtractor(
+            api_key=ocr_config.gemini_api_key,
+            model=ocr_config.gemini_model,
+        )
+        _diagnosis_pipeline = DiagnosisPipeline(
+            extractor=extractor,
+            retry_threshold=ocr_config.retry_threshold,
+            hitl_threshold=ocr_config.hitl_threshold,
+        )
+    return _diagnosis_pipeline
 
 
 def to_text(result: OcrResponse) -> str:
@@ -82,6 +98,46 @@ async def run_pipeline(file: UploadFile) -> OcrPipelineResult:
     logger.info(
         "OCR 완료 - 환자: %s, 약품 수: %d, 상태: %s, 신뢰도: %.2f",
         result.data.patient_name, len(result.data.medicines),
+        result.status, result.confidence.final,
+    )
+    return result
+
+
+def to_diagnosis_text(result: DiagnosisResponse) -> str:
+    lines = []
+    if result.patient_name:
+        lines.append(f"환자명: {result.patient_name}")
+    if result.birth_date:
+        lines.append(f"생년월일: {result.birth_date}")
+    if result.diagnosis_name:
+        lines.append(f"진단명: {result.diagnosis_name}")
+    if result.department:
+        lines.append(f"진료과: {result.department}")
+    if result.hospital_name:
+        lines.append(f"병원명: {result.hospital_name}")
+    if result.doctor_name:
+        lines.append(f"담당의: {result.doctor_name}")
+    if result.diagnosis_date:
+        lines.append(f"진단일: {result.diagnosis_date}")
+    if result.purpose:
+        lines.append(f"발급목적: {result.purpose}")
+    return "\n".join(lines)
+
+
+async def run_diagnosis_pipeline(file: UploadFile) -> DiagnosisPipelineResult:
+    contents = await file.read()
+    ext = validate_file(file.filename, len(contents))
+    try:
+        pipeline = get_diagnosis_pipeline()
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail="진단서 OCR 초기화 실패: GEMINI_API_KEY 또는 OCR 설정을 확인해주세요",
+        )
+    result = await asyncio.to_thread(pipeline.run, contents, _MIME_MAP[ext])
+    logger.info(
+        "진단서 OCR 완료 - 환자: %s, 진단명: %s, 상태: %s, 신뢰도: %.2f",
+        result.data.patient_name, result.data.diagnosis_name,
         result.status, result.confidence.final,
     )
     return result

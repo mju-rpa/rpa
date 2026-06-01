@@ -43,3 +43,22 @@ class OcrPipelineResult:
     data: OcrResponse
     confidence: ConfidenceResult
     retried: bool
+
+
+class DiagnosisResponse(BaseModel):
+    patient_name: str | None = None
+    birth_date: str | None = None
+    diagnosis_name: str | None = None
+    hospital_name: str | None = None
+    doctor_name: str | None = None
+    diagnosis_date: str | None = None
+    department: str | None = None
+    purpose: str | None = None
+
+
+@dataclass
+class DiagnosisPipelineResult:
+    status: Literal["ok", "hitl_required"]
+    data: DiagnosisResponse
+    confidence: ConfidenceResult
+    retried: bool

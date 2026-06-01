@@ -16,6 +16,7 @@ class AnalyzeRequest(BaseModel):
     연락처: ContactInfo = Field(default_factory=ContactInfo)
     stt_text: str = ""
     ocr_text: str = ""
+    diagnosis_text: str = ""
     # OCR/STT 인식 신뢰도 기반 HITL 신호 — {"ocr": {...}, "stt": {...}}
     # /input-process 가 채워서 반환. 점수 낮으면 채널별 status="hitl_required".
     hitl: dict = Field(default_factory=dict)
