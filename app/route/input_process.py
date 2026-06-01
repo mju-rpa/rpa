@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Literal, Optional
@@ -9,8 +10,10 @@ from fastapi import APIRouter, Form, HTTPException, UploadFile
 from fastapi.params import File
 
 from app.agentic_ai.schema.models import AnalyzeRequest
-from app.consult.ocr.service import extract_text_from_upload
-from app.consult.stt.service import transcribe_upload
+from app.consult.ocr.api.schema.schema import OcrPipelineResult
+from app.consult.ocr.service import run_pipeline as ocr_run_pipeline, to_text as ocr_to_text
+from app.consult.stt.api.schema.schema import SttPipelineResult
+from app.consult.stt.service import run_pipeline as stt_run_pipeline, to_text as stt_to_text
 
 logger = logging.getLogger(__name__)
 
@@ -34,29 +37,36 @@ async def input_process(
     if not has_audio and not has_image:
         raise HTTPException(status_code=400, detail="audio 또는 image 중 하나 이상 필요합니다")
 
-    tasks = {}
-    if has_audio:
-        tasks["stt"] = transcribe_upload(audio)
-    if has_image:
-        tasks["ocr"] = extract_text_from_upload(image)
+    stt_result, ocr_result = await asyncio.gather(
+        stt_run_pipeline(audio) if has_audio else asyncio.sleep(0, result=None),
+        ocr_run_pipeline(image) if has_image else asyncio.sleep(0, result=None),
+    )
 
-    results = await asyncio.gather(*tasks.values(), return_exceptions=True)
-    result_map = dict(zip(tasks.keys(), results))
-    for val in result_map.values():
-        if isinstance(val, Exception):
-            raise val
-
-    stt_text = result_map.get("stt", "")
-    ocr_text = result_map.get("ocr", "")
+    stt_text = stt_to_text(stt_result.data) if stt_result else ""
+    ocr_text = ocr_to_text(ocr_result.data) if ocr_result else ""
     response = AnalyzeRequest(
         patient_id=patient_id,
         환자명=환자명,
         알림매체=알림매체,
         stt_text=stt_text,
         ocr_text=ocr_text,
+        hitl=_hitl_block(stt_result, ocr_result),
     )
     await asyncio.to_thread(_save_results, patient_id or 환자명 or "unknown", stt_text, ocr_text, response)
     return response
+
+
+# ── helpers ──────────────────────────────────────────────────────────────────
+
+def _hitl_block(
+    stt: SttPipelineResult | None,
+    ocr: OcrPipelineResult | None,
+) -> dict:
+    return {
+        key: {"status": r.status, "retried": r.retried, "confidence": asdict(r.confidence)}
+        for key, r in (("stt", stt), ("ocr", ocr))
+        if r is not None
+    }
 
 
 def _save_results(label: str, stt_text: str, ocr_text: str, response: AnalyzeRequest) -> None:

@@ -16,6 +16,9 @@ class AnalyzeRequest(BaseModel):
     연락처: ContactInfo = Field(default_factory=ContactInfo)
     stt_text: str = ""
     ocr_text: str = ""
+    # OCR/STT 인식 신뢰도 기반 HITL 신호 — {"ocr": {...}, "stt": {...}}
+    # /input-process 가 채워서 반환. 점수 낮으면 채널별 status="hitl_required".
+    hitl: dict = Field(default_factory=dict)
     # HIDL (Human-In-The-Loop) — 미구현 시 기본값으로 파이프라인 통과
     hidl_enabled: bool = False
     hidl_approved: bool | None = None  # None=미검토, True/False=사용자 결정

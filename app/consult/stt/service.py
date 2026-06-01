@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
 
-from app.consult.stt.api.schema.schema import ALLOWED_EXTENSIONS, SttPipelineResult
+from app.consult.stt.api.schema.schema import ALLOWED_EXTENSIONS, SttPipelineResult, TranscribeResponse
 from app.consult.stt.core.config import stt_config
 from app.consult.stt.core.pipeline import STTPipeline
 from app.consult.stt.core.transcriber import (
@@ -86,12 +86,16 @@ async def run_pipeline(file: UploadFile) -> SttPipelineResult:
     return result
 
 
+def to_text(data: TranscribeResponse) -> str:
+    if data.segments:
+        return "\n".join(f"{s.speaker}: {s.text}" for s in data.segments)
+    return data.text
+
+
 async def transcribe_upload(file: UploadFile) -> str:
     """기존 호환성 — 텍스트만 필요한 호출처에서 사용."""
     result = await run_pipeline(file)
-    if result.data.segments:
-        return "\n".join(f"{s.speaker}: {s.text}" for s in result.data.segments)
-    return result.data.text
+    return to_text(result.data)
 
 
 async def transcribe_upload_raw(file: UploadFile) -> SttPipelineResult:
