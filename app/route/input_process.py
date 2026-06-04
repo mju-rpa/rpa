@@ -4,9 +4,9 @@ import logging
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Optional
 
-from fastapi import APIRouter, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Form, UploadFile
 from fastapi.params import File
 
 from app.agentic_ai.schema.models import AnalyzeRequest
@@ -25,23 +25,17 @@ OUTPUT_DIR = BASE_DIR / "output" / "input_process"
 
 @router.post("")
 async def input_process(
-    audio: Optional[UploadFile] = File(None),
-    image: Optional[UploadFile] = File(None),
+    audio: UploadFile = File(...),
+    image: UploadFile = File(...),
     diagnosis: Optional[UploadFile] = File(None),
-    patient_id: str = Form(""),
-    환자명: str = Form(""),
-    알림매체: Literal["kakao", "google_calendar", "sms", "none"] = Form("none"),
+    patient_name: str = Form(""),
 ):
     """STT + OCR(약봉투) + OCR(진단서) 병렬 처리 → AnalyzeRequest JSON."""
-    has_audio = bool(audio and audio.filename)
-    has_image = bool(image and image.filename)
     has_diagnosis = bool(diagnosis and diagnosis.filename)
-    if not has_audio and not has_image and not has_diagnosis:
-        raise HTTPException(status_code=400, detail="audio, image, diagnosis 중 하나 이상 필요합니다")
 
     stt_result, ocr_result, diagnosis_result = await asyncio.gather(
-        stt_run_pipeline(audio) if has_audio else asyncio.sleep(0, result=None),
-        ocr_run_pipeline(image) if has_image else asyncio.sleep(0, result=None),
+        stt_run_pipeline(audio),
+        ocr_run_pipeline(image),
         run_diagnosis_pipeline(diagnosis) if has_diagnosis else asyncio.sleep(0, result=None),
     )
 
@@ -49,15 +43,13 @@ async def input_process(
     ocr_text = ocr_to_text(ocr_result.data) if ocr_result else ""
     diagnosis_text = to_diagnosis_text(diagnosis_result.data) if diagnosis_result else ""
     response = AnalyzeRequest(
-        patient_id=patient_id,
-        환자명=환자명,
-        알림매체=알림매체,
+        환자명=patient_name,
         stt_text=stt_text,
         ocr_text=ocr_text,
         diagnosis_text=diagnosis_text,
         hitl=_hitl_block(stt_result, ocr_result, diagnosis_result),
     )
-    await asyncio.to_thread(_save_results, patient_id or 환자명 or "unknown", stt_text, ocr_text, diagnosis_text, response)
+    await asyncio.to_thread(_save_results, patient_name or "unknown", stt_text, ocr_text, diagnosis_text, response)
     return response
 
 
