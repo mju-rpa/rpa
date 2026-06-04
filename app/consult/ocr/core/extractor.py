@@ -176,6 +176,39 @@ def _parse_diagnosis_raw(raw: str) -> tuple[DiagnosisResponse, float]:
     ), llm_score
 
 
+class OpenAIExtractor(Extractor):
+    def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
+        logger.info("OpenAIExtractor 초기화 (model=%s)", model)
+        import base64
+        from openai import OpenAI
+        self._client = OpenAI(api_key=api_key)
+        self._model = model
+        self._base64 = base64
+
+    def extract(self, image_bytes: bytes, mime_type: str, retry: bool = False) -> tuple[OcrResponse, float]:
+        logger.info("[OpenAIExtractor] OCR 시작 - 이미지 크기: %d bytes, retry=%s", len(image_bytes), retry)
+        prompt = _PROMPT_RETRY if retry else _PROMPT
+        b64 = self._base64.b64encode(image_bytes).decode()
+        response = self._client.chat.completions.create(
+            model=self._model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{b64}"}},
+                        {"type": "text", "text": prompt},
+                    ],
+                }
+            ],
+            response_format={"type": "json_object"},
+        )
+        raw = response.choices[0].message.content.strip()
+        logger.debug("[OpenAIExtractor] 원본 응답: %s", raw)
+        result, llm_score = _parse_raw(raw)
+        logger.info("[OpenAIExtractor] OCR 완료 - 약품 수: %d, llm_score: %.2f", len(result.medicines), llm_score)
+        return result, llm_score
+
+
 class DiagnosisExtractor(ABC):
     @abstractmethod
     def extract(self, image_bytes: bytes, mime_type: str, retry: bool = False) -> tuple[DiagnosisResponse, float]:
@@ -204,4 +237,37 @@ class GeminiDiagnosisExtractor(DiagnosisExtractor):
         logger.debug("[GeminiDiagnosisExtractor] 원본 응답: %s", raw)
         result, llm_score = _parse_diagnosis_raw(raw)
         logger.info("[GeminiDiagnosisExtractor] 진단서 OCR 완료 - 진단명: %s, llm_score: %.2f", result.diagnosis_name, llm_score)
+        return result, llm_score
+
+
+class OpenAIDiagnosisExtractor(DiagnosisExtractor):
+    def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
+        logger.info("OpenAIDiagnosisExtractor 초기화 (model=%s)", model)
+        import base64
+        from openai import OpenAI
+        self._client = OpenAI(api_key=api_key)
+        self._model = model
+        self._base64 = base64
+
+    def extract(self, image_bytes: bytes, mime_type: str, retry: bool = False) -> tuple[DiagnosisResponse, float]:
+        logger.info("[OpenAIDiagnosisExtractor] 진단서 OCR 시작 - %d bytes, retry=%s", len(image_bytes), retry)
+        prompt = _DIAGNOSIS_PROMPT_RETRY if retry else _DIAGNOSIS_PROMPT
+        b64 = self._base64.b64encode(image_bytes).decode()
+        response = self._client.chat.completions.create(
+            model=self._model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{b64}"}},
+                        {"type": "text", "text": prompt},
+                    ],
+                }
+            ],
+            response_format={"type": "json_object"},
+        )
+        raw = response.choices[0].message.content.strip()
+        logger.debug("[OpenAIDiagnosisExtractor] 원본 응답: %s", raw)
+        result, llm_score = _parse_diagnosis_raw(raw)
+        logger.info("[OpenAIDiagnosisExtractor] 진단서 OCR 완료 - 진단명: %s, llm_score: %.2f", result.diagnosis_name, llm_score)
         return result, llm_score

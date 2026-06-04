@@ -6,7 +6,7 @@ from fastapi import HTTPException, UploadFile
 
 from app.consult.ocr.api.schema.schema import ALLOWED_EXTENSIONS, DiagnosisPipelineResult, DiagnosisResponse, OcrPipelineResult, OcrResponse
 from app.consult.ocr.core.config import ocr_config
-from app.consult.ocr.core.extractor import GeminiDiagnosisExtractor, GeminiExtractor
+from app.consult.ocr.core.extractor import GeminiDiagnosisExtractor, GeminiExtractor, OpenAIDiagnosisExtractor, OpenAIExtractor
 from app.consult.ocr.core.pipeline import DiagnosisPipeline, OCRPipeline
 
 logger = logging.getLogger(__name__)
@@ -27,10 +27,16 @@ _diagnosis_pipeline: DiagnosisPipeline | None = None
 def get_pipeline() -> OCRPipeline:
     global _pipeline
     if _pipeline is None:
-        extractor = GeminiExtractor(
-            api_key=ocr_config.gemini_api_key,
-            model=ocr_config.gemini_model,
-        )
+        if ocr_config.extractor_type == "openai":
+            extractor = OpenAIExtractor(
+                api_key=ocr_config.openai_api_key,
+                model=ocr_config.openai_model,
+            )
+        else:
+            extractor = GeminiExtractor(
+                api_key=ocr_config.gemini_api_key,
+                model=ocr_config.gemini_model,
+            )
         _pipeline = OCRPipeline(
             extractor=extractor,
             retry_threshold=ocr_config.retry_threshold,
@@ -42,10 +48,16 @@ def get_pipeline() -> OCRPipeline:
 def get_diagnosis_pipeline() -> DiagnosisPipeline:
     global _diagnosis_pipeline
     if _diagnosis_pipeline is None:
-        extractor = GeminiDiagnosisExtractor(
-            api_key=ocr_config.gemini_api_key,
-            model=ocr_config.gemini_model,
-        )
+        if ocr_config.extractor_type == "openai":
+            extractor = OpenAIDiagnosisExtractor(
+                api_key=ocr_config.openai_api_key,
+                model=ocr_config.openai_model,
+            )
+        else:
+            extractor = GeminiDiagnosisExtractor(
+                api_key=ocr_config.gemini_api_key,
+                model=ocr_config.gemini_model,
+            )
         _diagnosis_pipeline = DiagnosisPipeline(
             extractor=extractor,
             retry_threshold=ocr_config.retry_threshold,
