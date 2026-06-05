@@ -50,9 +50,9 @@ def build_agent_trace(
         {
             "step": 8,
             "role": "Agentic AI",
-            "agent": "Risk Scorer",
-            "action": "복약 위험도 점수 산출",
-            "detail": f"{risk['최종점수']}점, 재검토={risk['재검토_필요']}",
+            "agent": "Risk Evaluator",
+            "action": "DB 기반 위험도 군집 분류",
+            "detail": f"군집={risk.get('군집', '일반')}, HITL={risk.get('HITL_필요', False)}",
         }
     )
     if hidl_trace:
