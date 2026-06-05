@@ -8,6 +8,7 @@ from app.consult.ocr.api.schema.schema import ALLOWED_EXTENSIONS, DiagnosisPipel
 from app.consult.ocr.core.config import ocr_config
 from app.consult.ocr.core.extractor import GeminiDiagnosisExtractor, GeminiExtractor, OpenAIDiagnosisExtractor, OpenAIExtractor
 from app.consult.ocr.core.pipeline import DiagnosisPipeline, OCRPipeline
+from app.consult.ocr.agents.validator import DiagnosisLLMValidator, OcrLLMValidator
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +38,10 @@ def get_pipeline() -> OCRPipeline:
                 api_key=ocr_config.gemini_api_key,
                 model=ocr_config.gemini_model,
             )
+        validator = OcrLLMValidator(api_key=ocr_config.openai_api_key, model=ocr_config.openai_model)
         _pipeline = OCRPipeline(
             extractor=extractor,
+            validator=validator,
             retry_threshold=ocr_config.retry_threshold,
             hitl_threshold=ocr_config.hitl_threshold,
         )
@@ -58,8 +61,10 @@ def get_diagnosis_pipeline() -> DiagnosisPipeline:
                 api_key=ocr_config.gemini_api_key,
                 model=ocr_config.gemini_model,
             )
+        diagnosis_validator = DiagnosisLLMValidator(api_key=ocr_config.openai_api_key, model=ocr_config.openai_model)
         _diagnosis_pipeline = DiagnosisPipeline(
             extractor=extractor,
+            validator=diagnosis_validator,
             retry_threshold=ocr_config.retry_threshold,
             hitl_threshold=ocr_config.hitl_threshold,
         )
@@ -110,7 +115,7 @@ async def run_pipeline(file: UploadFile) -> OcrPipelineResult:
     logger.info(
         "OCR 완료 - 환자: %s, 약품 수: %d, 상태: %s, 신뢰도: %.2f",
         result.data.patient_name, len(result.data.medicines),
-        result.status, result.confidence.final,
+        result.status, result.confidence.score,
     )
     return result
 
@@ -150,7 +155,7 @@ async def run_diagnosis_pipeline(file: UploadFile) -> DiagnosisPipelineResult:
     logger.info(
         "진단서 OCR 완료 - 환자: %s, 진단명: %s, 상태: %s, 신뢰도: %.2f",
         result.data.patient_name, result.data.diagnosis_name,
-        result.status, result.confidence.final,
+        result.status, result.confidence.score,
     )
     return result
 

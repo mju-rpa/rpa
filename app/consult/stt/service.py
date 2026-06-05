@@ -15,6 +15,7 @@ from app.consult.stt.core.transcriber import (
     RemoteWhisperTranscriber,
     WhisperTranscriber,
 )
+from app.consult.stt.agents.validator import SttLLMValidator
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +52,10 @@ def get_pipeline() -> STTPipeline:
             compute_type=stt_config.compute_type,
         )
 
+    validator = SttLLMValidator(api_key=stt_config.openai_api_key)
     _pipeline = STTPipeline(
         transcriber=transcriber,
+        validator=validator,
         retry_threshold=stt_config.retry_threshold,
         hitl_threshold=stt_config.hitl_threshold,
     )
@@ -82,7 +85,7 @@ async def run_pipeline(file: UploadFile) -> SttPipelineResult:
     finally:
         os.unlink(tmp.name)
     logger.info("[STT] 완료 - 텍스트 길이: %d, 상태: %s, 신뢰도: %.2f",
-                len(result.data.text), result.status, result.confidence.final)
+                len(result.data.text), result.status, result.confidence.score)
     return result
 
 
