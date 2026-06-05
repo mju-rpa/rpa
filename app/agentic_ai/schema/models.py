@@ -10,7 +10,8 @@ class ContactInfo(BaseModel):
 
 
 class AnalyzeRequest(BaseModel):
-    patient_id: str = ""
+    patient_name: str = ""
+    patient_phone: str = ""
     환자명: str = ""
     알림매체: Literal["kakao", "google_calendar", "sms", "none"] = "none"
     연락처: ContactInfo = Field(default_factory=ContactInfo)

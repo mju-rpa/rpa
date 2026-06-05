@@ -33,8 +33,8 @@ class OcrResponse(BaseModel):
 class ConfidenceResult:
     llm_score: float
     rule_score: float
-    final: float
-    low_fields: list[str] = dc_field(default_factory=list)
+    score: float
+    response: str = ""
 
 
 @dataclass
