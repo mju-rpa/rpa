@@ -7,8 +7,11 @@ from app.consult.ocr.api.schema.schema import ConfidenceResult, DiagnosisRespons
 logger = logging.getLogger(__name__)
 
 _PROMPT = """
-이 이미지는 한국 약봉투입니다. 이미지에서 다음 정보를 추출하여 JSON으로만 응답하세요.
-다른 텍스트 없이 JSON만 반환하세요.
+이 이미지는 한국 약봉투(약봉지)입니다. 이미지에 인쇄된 텍스트를 정확히 읽어 아래 JSON 스키마에 맞게 추출하세요.
+반드시 JSON만 반환하고 다른 텍스트는 일절 포함하지 마세요.
+
+중요: medicines 배열에는 이미지에서 읽히는 모든 약품명을 빠짐없이 포함하세요.
+약품명(name)은 이미지에 인쇄된 한글 약품명을 그대로 옮겨 적으세요. 생략하거나 임의로 변경하지 마세요.
 
 스키마:
 {
@@ -16,23 +19,23 @@ _PROMPT = """
   "patient_name_confidence": 0.0,
   "prescribed_date": "처방일 YYYY-MM-DD 형식 (없으면 null)",
   "prescribed_date_confidence": 0.0,
-  "hospital_name": "병원/약국명 (없으면 null)",
+  "hospital_name": "병원명 또는 약국명 (없으면 null)",
   "hospital_name_confidence": 0.0,
   "medicines": [
     {
-      "name": "약품명",
+      "name": "약품명 (이미지에 인쇄된 한글 약품명 그대로, 없으면 null)",
       "name_confidence": 0.0,
-      "dosage": "1회 복용량 (없으면 null)",
+      "dosage": "1회 복용량 예: 1정, 2캡슐 (없으면 null)",
       "dosage_confidence": 0.0,
-      "frequency": "1일 복용 횟수 (없으면 null)",
+      "frequency": "1일 복용 횟수 예: 1일 3회 (없으면 null)",
       "frequency_confidence": 0.0,
-      "timing": "복용 시기 예: 식후 30분 (없으면 null)",
+      "timing": "복용 시기 예: 식후 30분, 취침 전 (없으면 null)",
       "timing_confidence": 0.0,
-      "caution": "해당 약 주의사항 (없으면 null)",
+      "caution": "해당 약 개별 주의사항 (없으면 null)",
       "caution_confidence": 0.0
     }
   ],
-  "general_caution": "전체 공통 주의사항 (없으면 null)",
+  "general_caution": "약봉투 전체에 공통으로 적힌 주의사항 (없으면 null)",
   "general_caution_confidence": 0.0
 }
 
@@ -113,7 +116,7 @@ class GeminiExtractor(Extractor):
         )
 
         raw = response.text.strip()
-        logger.debug("[GeminiExtractor] 원본 응답: %s", raw)
+        logger.info("[GeminiExtractor] LLM 원본 응답: %s", raw)
         result, llm_score = _parse_raw(raw)
         logger.info("[GeminiExtractor] OCR 완료 - 약품 수: %d, llm_score: %.2f", len(result.medicines), llm_score)
         return result, llm_score
@@ -203,7 +206,7 @@ class OpenAIExtractor(Extractor):
             response_format={"type": "json_object"},
         )
         raw = response.choices[0].message.content.strip()
-        logger.debug("[OpenAIExtractor] 원본 응답: %s", raw)
+        logger.info("[OpenAIExtractor] LLM 원본 응답: %s", raw)
         result, llm_score = _parse_raw(raw)
         logger.info("[OpenAIExtractor] OCR 완료 - 약품 수: %d, llm_score: %.2f", len(result.medicines), llm_score)
         return result, llm_score
@@ -234,7 +237,7 @@ class GeminiDiagnosisExtractor(DiagnosisExtractor):
             ],
         )
         raw = response.text.strip()
-        logger.debug("[GeminiDiagnosisExtractor] 원본 응답: %s", raw)
+        logger.info("[GeminiDiagnosisExtractor] LLM 원본 응답: %s", raw)
         result, llm_score = _parse_diagnosis_raw(raw)
         logger.info("[GeminiDiagnosisExtractor] 진단서 OCR 완료 - 진단명: %s, llm_score: %.2f", result.diagnosis_name, llm_score)
         return result, llm_score
@@ -267,7 +270,7 @@ class OpenAIDiagnosisExtractor(DiagnosisExtractor):
             response_format={"type": "json_object"},
         )
         raw = response.choices[0].message.content.strip()
-        logger.debug("[OpenAIDiagnosisExtractor] 원본 응답: %s", raw)
+        logger.info("[OpenAIDiagnosisExtractor] LLM 원본 응답: %s", raw)
         result, llm_score = _parse_diagnosis_raw(raw)
         logger.info("[OpenAIDiagnosisExtractor] 진단서 OCR 완료 - 진단명: %s, llm_score: %.2f", result.diagnosis_name, llm_score)
         return result, llm_score

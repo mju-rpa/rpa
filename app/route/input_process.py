@@ -29,6 +29,7 @@ async def input_process(
     image: UploadFile = File(...),
     diagnosis: Optional[UploadFile] = File(None),
     patient_name: str = Form(""),
+    patient_phone: str = Form(""),
 ):
     """STT + OCR(약봉투) + OCR(진단서) 병렬 처리 → AnalyzeRequest JSON."""
     has_diagnosis = bool(diagnosis and diagnosis.filename)
@@ -43,6 +44,8 @@ async def input_process(
     ocr_text = ocr_to_text(ocr_result.data) if ocr_result else ""
     diagnosis_text = to_diagnosis_text(diagnosis_result.data) if diagnosis_result else ""
     response = AnalyzeRequest(
+        patient_name=patient_name,
+        patient_phone=patient_phone,
         환자명=patient_name,
         stt_text=stt_text,
         ocr_text=ocr_text,
@@ -50,7 +53,7 @@ async def input_process(
         hitl=_hitl_block(stt_result, ocr_result, diagnosis_result),
     )
     await asyncio.to_thread(_save_results, patient_name or "unknown", stt_text, ocr_text, diagnosis_text, response)
-    return response
+    return response.model_dump(exclude={"환자명", "알림매체", "연락처"})
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
