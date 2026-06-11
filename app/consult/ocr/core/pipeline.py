@@ -1,5 +1,6 @@
 import logging
 from app.consult.ocr.api.schema.schema import DiagnosisPipelineResult, OcrPipelineResult
+from app.consult.ocr.core.blur import laplacian_variance
 from app.consult.ocr.core.extractor import DiagnosisExtractor, Extractor
 from app.consult.ocr.core.scorer import DiagnosisScorer, OcrScorer
 from app.consult.ocr.agents.validator import DiagnosisLLMValidator, OcrLLMValidator
@@ -22,16 +23,17 @@ class OCRPipeline:
         self._hitl_threshold = hitl_threshold
 
     def run(self, image_bytes: bytes, mime_type: str) -> OcrPipelineResult:
+        blur_var = laplacian_variance(image_bytes)  # 이미지 고정 — 1회만 측정
         response, _ = self._extractor.extract(image_bytes, mime_type, retry=False)
         llm_score, llm_reason = self._validator.validate(response)
-        confidence = self._scorer.score(response, llm_score, llm_reason)
+        confidence = self._scorer.score(response, llm_score, llm_reason, blur_var)
         retried = False
 
         if confidence.score < self._retry_threshold:
             logger.info("[OCRPipeline] 신뢰도 낮음(%.2f) — 재시도", confidence.score)
             response, _ = self._extractor.extract(image_bytes, mime_type, retry=True)
             llm_score, llm_reason = self._validator.validate(response)
-            confidence = self._scorer.score(response, llm_score, llm_reason)
+            confidence = self._scorer.score(response, llm_score, llm_reason, blur_var)
             retried = True
 
         status = "hitl_required" if confidence.score < self._hitl_threshold else "ok"

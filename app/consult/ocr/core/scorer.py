@@ -2,6 +2,7 @@ import logging
 import sqlite3
 
 from app.consult.ocr.api.schema.schema import ConfidenceResult, DiagnosisResponse, OcrResponse
+from app.consult.ocr.core.config import ocr_config
 from app.config import DRUG_SAFETY_DB_PATH
 from app.agentic_ai.drug_db.connection import connect as db_connect
 
@@ -31,8 +32,14 @@ def _drug_exists_in_db(conn: sqlite3.Connection, name: str) -> bool:
 
 
 class OcrScorer:
-    def score(self, response: OcrResponse, llm_score: float, llm_reason: str = "") -> ConfidenceResult:
-        rule_score, parts = self._rule_score(response)
+    def score(
+        self,
+        response: OcrResponse,
+        llm_score: float,
+        llm_reason: str = "",
+        blur_var: float | None = None,
+    ) -> ConfidenceResult:
+        rule_score, parts = self._rule_score(response, blur_var)
         score = round(llm_score * 0.5 + rule_score * 0.5, 4)
         resp_text = " | ".join(parts)
         if llm_reason:
@@ -45,38 +52,53 @@ class OcrScorer:
             response=resp_text,
         )
 
-    def _rule_score(self, r: OcrResponse) -> tuple[float, list[str]]:
+    def _rule_score(self, r: OcrResponse, blur_var: float | None) -> tuple[float, list[str]]:
+        # rule = 약품추출(0.4) + DB매칭(0.4) + 선명도(0.2)
         score = 0.0
         parts: list[str] = []
 
-        # (1) 약품 존재 여부
+        # (1) 약품 존재 여부 (0.4)
         if r.medicines:
-            score += 0.5
+            score += 0.4
             parts.append(f"약품 {len(r.medicines)}개 추출됨")
+
+            # (2) DB에 존재하는 약품명이 하나라도 있는지 (0.4)
+            conn = _get_db()
+            if conn is not None:
+                db_matched = any(
+                    _drug_exists_in_db(conn, m.name)
+                    for m in r.medicines
+                    if m.name
+                )
+                if db_matched:
+                    score += 0.4
+                    parts.append("DB 약품명 확인")
+                else:
+                    names = [m.name for m in r.medicines if m.name]
+                    parts.append(f"DB 약품명 미확인: {', '.join(names)}")
+                    logger.info("[OcrScorer] DB에서 약품명 미확인: %s", names)
+            else:
+                score += 0.4
+                parts.append("DB 미가용(패스)")
         else:
             parts.append("약품 없음")
-            return score, parts
 
-        # (2) DB에 존재하는 약품명이 하나라도 있는지
-        conn = _get_db()
-        if conn is not None:
-            db_matched = any(
-                _drug_exists_in_db(conn, m.name)
-                for m in r.medicines
-                if m.name
-            )
-            if db_matched:
-                score += 0.5
-                parts.append("DB 약품명 확인")
-            else:
-                names = [m.name for m in r.medicines if m.name]
-                parts.append(f"DB 약품명 미확인: {', '.join(names)}")
-                logger.info("[OcrScorer] DB에서 약품명 미확인: %s", names)
-        else:
-            score += 0.5
-            parts.append("DB 미가용(패스)")
+        # (3) 이미지 선명도/흔들림 (0.2)
+        sharp_score, sharp_part = self._sharpness_subscore(blur_var)
+        score += sharp_score
+        parts.append(sharp_part)
 
         return round(score, 4), parts
+
+    @staticmethod
+    def _sharpness_subscore(blur_var: float | None) -> tuple[float, str]:
+        """라플라시안 분산 → 0~0.2 점수. blur_min~blur_good 사이 선형 정규화."""
+        if blur_var is None:
+            return 0.2, "선명도 측정불가(패스)"
+        lo, hi = ocr_config.blur_min, ocr_config.blur_good
+        norm = max(0.0, min(1.0, (blur_var - lo) / (hi - lo))) if hi > lo else 1.0
+        label = "선명" if norm >= 0.5 else "흔들림 의심"
+        return round(norm * 0.2, 4), f"{label}(blur={blur_var:.0f})"
 
 
 class DiagnosisScorer:
