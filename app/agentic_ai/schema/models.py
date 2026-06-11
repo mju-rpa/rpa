@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ContactInfo(BaseModel):
@@ -15,6 +15,13 @@ class AnalyzeRequest(BaseModel):
     환자명: str = ""
     알림매체: Literal["kakao", "google_calendar", "sms", "none"] = "none"
     연락처: ContactInfo = Field(default_factory=ContactInfo)
+    # 구조화된 STT/OCR 결과 — /input-process 응답 형태.
+    #   stt: {text, language, duration, segments:[{speaker,text,start,end}]}
+    #   ocr: {prescribed_date, hospital_name, medicines:[...], general_caution}
+    stt: dict = Field(default_factory=dict)
+    ocr: dict = Field(default_factory=dict)
+    # 평탄화 텍스트 — agentic 파이프라인(collect_convert)이 사용.
+    # 구조화 stt/ocr만 들어온 경우 validator가 자동 backfill.
     stt_text: str = ""
     ocr_text: str = ""
     diagnosis_text: str = ""
@@ -24,6 +31,19 @@ class AnalyzeRequest(BaseModel):
     # HIDL (Human-In-The-Loop) — 미구현 시 기본값으로 파이프라인 통과
     hidl_enabled: bool = False
     hidl_approved: bool | None = None  # None=미검토, True/False=사용자 결정
+
+    @model_validator(mode="after")
+    def _backfill_flat_text(self):
+        """구조화 stt/ocr만 있고 평탄화 텍스트가 비면 backfill (재수집 호환)."""
+        if not self.stt_text and self.stt:
+            self.stt_text = self.stt.get("text", "") or ""
+        if not self.ocr_text and self.ocr:
+            from app.consult.ocr.api.schema.schema import OcrResponse
+            from app.consult.ocr.service import to_text as ocr_to_text
+            self.ocr_text = ocr_to_text(
+                OcrResponse(patient_name=self.patient_name or None, **self.ocr)
+            )
+        return self
 
 
 class MedicationItem(BaseModel):

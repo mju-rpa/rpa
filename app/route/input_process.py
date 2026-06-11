@@ -47,16 +47,45 @@ async def input_process(
         patient_name=patient_name,
         patient_phone=patient_phone,
         환자명=patient_name,
+        stt=_stt_block(stt_result, stt_text),
+        ocr=_ocr_block(ocr_result),
         stt_text=stt_text,
         ocr_text=ocr_text,
         diagnosis_text=diagnosis_text,
         hitl=_hitl_block(stt_result, ocr_result, diagnosis_result),
     )
     await asyncio.to_thread(_save_results, patient_name or "unknown", stt_text, ocr_text, diagnosis_text, response)
-    return response.model_dump(exclude={"환자명", "알림매체", "연락처"})
+    # stt_text/ocr_text 는 구조화된 stt/ocr 로 대체 — 응답에서 제외 (내부 backfill 용으로만 보유)
+    return response.model_dump(exclude={"환자명", "알림매체", "연락처", "stt_text", "ocr_text"})
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
+
+def _stt_block(stt: SttPipelineResult | None, stt_text: str) -> dict:
+    """STT 결과 → {text, language, duration, segments}. text 는 화자별 이어붙인 텍스트."""
+    if stt is None:
+        return {}
+    data = stt.data
+    return {
+        "text": stt_text,
+        "language": data.language,
+        "duration": data.duration,
+        "segments": [s.model_dump() for s in data.segments],
+    }
+
+
+def _ocr_block(ocr: OcrPipelineResult | None) -> dict:
+    """OCR(약봉투) 결과 → {prescribed_date, hospital_name, medicines, general_caution}."""
+    if ocr is None:
+        return {}
+    data = ocr.data
+    return {
+        "prescribed_date": data.prescribed_date,
+        "hospital_name": data.hospital_name,
+        "medicines": [m.model_dump() for m in data.medicines],
+        "general_caution": data.general_caution,
+    }
+
 
 def _hitl_block(
     stt: SttPipelineResult | None,

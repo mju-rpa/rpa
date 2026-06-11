@@ -136,7 +136,11 @@ class ClovaSpeechTranscriber(Transcriber):
         text = " ".join(s.text for s in segments) if segments else body.get("text", "")
         duration = body.get("segments", [{}])[-1].get("end", 0) / 1000 if body.get("segments") else 0.0
 
-        logger.info("[ClovaSpeechTranscriber] 전사 완료 - 화자 수=%d, 텍스트 길이=%d자", len({s.speaker for s in segments}), len(text))
+        speakers = sorted({s.speaker for s in segments})
+        logger.info("[ClovaSpeechTranscriber] 전사 완료 - 화자 수=%d(%s), 세그먼트 수=%d, 길이=%.1fs, 텍스트 길이=%d자",
+                    len(speakers), ", ".join(speakers), len(segments), duration, len(text))
+        for seg in segments:
+            logger.info("[ClovaSpeechTranscriber] [%.1fs~%.1fs] %s: %s", seg.start, seg.end, seg.speaker, seg.text)
         logger.debug("[ClovaSpeechTranscriber] 결과 텍스트: %s", text)
 
         return TranscriptionResult(text=text, language="ko", duration=duration, segments=segments)
