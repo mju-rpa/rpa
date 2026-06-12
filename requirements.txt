@@ -9,5 +9,8 @@ faster-whisper>=1.0.3
 openai>=1.30.0
 google-genai>=1.0.0
 # Agentic AI
+# OCR 이미지 선명도(흔들림) 평가 — 라플라시안 분산
+opencv-python-headless>=4.9.0
+numpy>=1.26.0
 crewai>=0.80.0
 chromadb>=0.6.0
