@@ -1,31 +1,16 @@
-
-# As Is[Agentic AI Merge 이전]
-# fastapi>=0.110.0
-# uvicorn[standard]>=0.27.0
-# pydantic>=2.6.0
-# requests>=2.31.0
-# python-multipart>=0.0.9
-# python-dotenv>=1.0.0
-# # consult OCR/STT
-# faster-whisper>=1.0.3
-# openai>=1.30.0
-# google-genai>=1.0.0
-# # Agentic AI — CrewAI
-# crewai>=0.80.0
-
-# To Be[Agentic AI Merge 이후 버전 변경 시도]
 fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
-# 오류로 인해 버전 변경
-pydantic>=2.6.0,<3.0.0
+pydantic>=2.6.0
 requests>=2.31.0
 python-multipart>=0.0.9
 python-dotenv>=1.0.0
-# OCR/STT
+# consult OCR/STT
 faster-whisper>=1.0.3
 openai>=1.30.0
 google-genai>=1.0.0
+# Agentic AI
 # OCR 이미지 선명도(흔들림) 평가 — 라플라시안 분산
 opencv-python-headless>=4.9.0
 numpy>=1.26.0
 crewai>=0.80.0
+chromadb>=0.6.0
