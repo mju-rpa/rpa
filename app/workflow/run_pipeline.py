@@ -13,7 +13,7 @@ def run_pipeline(req: AnalyzeRequest, output_dir: Path) -> dict:
     """
     step01 → step02 → step03(HITL) → step04
     """
-    patient = req.환자명 or req.patient_id or "unknown"
+    patient = req.patient_name or req.환자명 or "unknown"
     try:
         # ── step01 ────────────────────────────────────────────
         workflow_log("SUCCESS", "step01", f"collect_convert start patient={patient}")
@@ -27,7 +27,7 @@ def run_pipeline(req: AnalyzeRequest, output_dir: Path) -> dict:
 
         # ── step02: Agentic AI ────────────────────────────────
         workflow_log("SUCCESS", "step02", "agentic AI start")
-        agentic = agentic_analyze_reflect_score(stt, ocr, req.환자명, req.알림매체)
+        agentic = agentic_analyze_reflect_score(stt, ocr, req.patient_name or req.환자명, req.알림매체, getattr(req, "diagnosis_text", ""), getattr(req, "hitl", {}))
 
         stt_summary = agentic.get("stt_summary", {})
         ocr_data    = agentic.get("ocr_data", {})

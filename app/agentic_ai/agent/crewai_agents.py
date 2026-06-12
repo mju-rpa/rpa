@@ -149,6 +149,8 @@ def run_crewai_pipeline(
     stt: str,
     ocr: str,
     알림매체: str = "none",
+    diagnosis_text: str = "",  # 진단서 OCR 텍스트 (선택)
+    hitl: dict = None,         # OCR/STT 신뢰도 기반 HITL 신호
 ) -> dict:
     """
     CrewAI Multi-Agent Sequential Workflow 실행.
@@ -157,6 +159,32 @@ def run_crewai_pipeline(
     모든 판단은 DB 정보만 기반으로 수행.
     LLM은 텍스트 파싱/요약/비교/정리만 담당.
     """
+    hitl = hitl or {}
+
+    # ── HITL 신뢰도 경고 생성 ─────────────────────────────────
+    hitl_warnings = []
+    stt_hitl = hitl.get("stt", {})
+    ocr_hitl = hitl.get("ocr", {})
+
+    if stt_hitl.get("status") == "hitl_required":
+        score = stt_hitl.get("confidence", {}).get("score", 0)
+        reason = stt_hitl.get("confidence", {}).get("response", "")
+        hitl_warnings.append(
+            f"⚠️ STT 신뢰도 낮음 (점수: {score:.2f}) - {reason}"
+        )
+
+    if ocr_hitl.get("status") == "hitl_required":
+        score = ocr_hitl.get("confidence", {}).get("score", 0)
+        reason = ocr_hitl.get("confidence", {}).get("response", "")
+        hitl_warnings.append(
+            f"⚠️ OCR 신뢰도 낮음 (점수: {score:.2f}) - {reason}"
+        )
+
+    hitl_warning_text = (
+        "\n".join(hitl_warnings)
+        if hitl_warnings
+        else "STT/OCR 신뢰도 정상"
+    )
     llm = get_crewai_llm()
 
     # ── DB 사전 조회 (LLM 실행 전) ────────────────────────────
@@ -264,6 +292,12 @@ STT 텍스트에서 증상, 불편사항, 상담 맥락, 언급된 약품명을 
 [STT 텍스트]
 {stt}
 
+[진단서 텍스트 (있는 경우)]
+{diagnosis_text if diagnosis_text else "없음"}
+
+[STT/OCR 신뢰도 경고]
+{hitl_warning_text}
+
 주의:
 - 텍스트에 있는 내용만 추출하라
 - 의학적 판단을 내리지 마라
@@ -327,9 +361,13 @@ STT에서 언급된 약품과 OCR 약품 목록을 비교하여 불일치를 체
 [OCR 약품 목록]
 (앞선 OCR Agent 결과 참고)
 
+[STT/OCR 신뢰도 경고]
+{hitl_warning_text}
+
 체크 항목:
 1. STT에서 언급된 약품이 OCR 목록에 있는가
 2. OCR에만 있고 STT에서 언급되지 않은 약품이 있는가
+3. STT/OCR 신뢰도 경고가 있으면 불일치 주의사항에 반드시 포함하라
 
 주의:
 - 있다/없다만 확인하라

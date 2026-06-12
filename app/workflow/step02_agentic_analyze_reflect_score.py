@@ -19,13 +19,15 @@ def agentic_analyze_reflect_score(
     ocr: str,
     환자명: str = "",
     알림매체: str = "none",
+    diagnosis_text: str = "",  # 진단서 OCR 텍스트 (선택)
+    hitl: dict = None,         # OCR/STT 신뢰도 기반 HITL 신호
 ) -> dict:
     use_mock = uses_mock_llm()
 
     if use_mock:
         result = mock_crewai_result(stt, ocr, 알림매체)
     else:
-        result = run_crewai_pipeline(stt, ocr, 알림매체)
+        result = run_crewai_pipeline(stt, ocr, 알림매체, diagnosis_text=diagnosis_text, hitl=hitl)
 
     # 환자명 오버라이드 (요청값 우선)
     if 환자명 and result.get("guidance"):
