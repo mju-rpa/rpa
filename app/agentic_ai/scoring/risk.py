@@ -1,20 +1,72 @@
-from app.config import RISK_SCORE_REVIEW_THRESHOLD
+"""복약 위험도 점수(100점 감점제).
+
+상호작용 감점은 약물안전 DB(drug_safety.db) 조회를 주축으로 한다.
+약품이 DB에서 해석되지 않거나 DB가 없으면 기존 키워드 채점으로 폴백한다(하이브리드).
+"""
+from app.agentic_ai.drug_db.connection import connect
+from app.agentic_ai.drug_db.safety import assess
+from app.config import (
+    DRUG_SAFETY_DB_PATH,
+    RISK_SCORE_REVIEW_THRESHOLD,
+    drug_db_enabled,
+)
+
+_UNSET = object()
+_HIGH_RISK_KEYWORDS = ["금기", "병용", "함께 복용하지", "우유"]
 
 
-def compute_risk_score(stt: str, ocr: str, analysis: dict) -> dict:
+def _open_default_conn():
+    if not drug_db_enabled():
+        return None
+    return connect(DRUG_SAFETY_DB_PATH)
+
+
+def _interaction_deductions(conn, drug_names, analysis) -> list[dict]:
+    """상호작용 감점 항목. DB 매칭 성공 시 DB 근거, 아니면 키워드 폴백."""
+    if conn is not None and drug_names:
+        result = assess(conn, drug_names)
+        if result["resolved"]:
+            if not result["interactions"]:
+                return []
+            detail = "; ".join(
+                f"{f['약품1']}+{f['약품2']}: {f['금기사유']}"
+                for f in result["interactions"]
+            )
+            return [
+                {
+                    "항목": "상호작용·병용금기 (DB 확인)",
+                    "감점": 30,
+                    "근거": "DB:drug_interactions",
+                    "금기사유": detail,
+                    "약품쌍": [
+                        [f["약품1"], f["약품2"]] for f in result["interactions"]
+                    ],
+                }
+            ]
+
+    # 폴백: 분석 텍스트의 키워드로 판정 (레거시)
+    warning = analysis.get("상호작용_경고", "")
+    if any(k in warning for k in _HIGH_RISK_KEYWORDS):
+        return [{"항목": "상호작용·복용 주의 경고", "감점": 30}]
+    return []
+
+
+def compute_risk_score(stt: str, ocr: str, analysis: dict, conn=_UNSET) -> dict:
     """복약 위험도 점수: 100점에서 감점."""
+    if conn is _UNSET:
+        conn = _open_default_conn()
+
     score = 100
     deductions: list[dict] = []
-
-    warning = analysis.get("상호작용_경고", "")
     meds = analysis.get("필수복약리스트", [])
+    drug_names = [m.get("약품명", "") for m in meds if m.get("약품명")]
 
-    high_risk_keywords = ["금기", "병용", "함께 복용하지", "우유"]
-    if any(k in warning for k in high_risk_keywords):
-        score -= 30
-        deductions.append({"항목": "상호작용·복용 주의 경고", "감점": 30})
+    # ── 1. 상호작용·병용금기 (DB 주축 + 키워드 폴백) ──
+    for item in _interaction_deductions(conn, drug_names, analysis):
+        score -= item["감점"]
+        deductions.append(item)
 
-    ocr_lower = ocr.lower()
+    # ── 2. 약품명 불일치 (OCR/STT 대조) ──
     for med in meds:
         name = med.get("약품명", "")
         core = name.split()[0] if name else ""
@@ -23,6 +75,7 @@ def compute_risk_score(stt: str, ocr: str, analysis: dict) -> dict:
             deductions.append({"항목": f"약품명 불일치 의심: {name}", "감점": 20})
             break
 
+    # ── 3. 복용 횟수 과다 ──
     daily_count = sum(
         1 for m in meds if "1일" in m.get("복용시간", "") or "매일" in m.get("주의사항", "")
     )

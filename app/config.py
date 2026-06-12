@@ -4,6 +4,17 @@ import os
 RISK_SCORE_REVIEW_THRESHOLD = 70
 MAX_REFLECTION_ROUNDS = 3
 
+# 위험도 채점에 사용할 약물안전 DB(SQLite, LFS). 없으면 키워드 채점으로 폴백.
+DRUG_SAFETY_DB_PATH = os.getenv("DRUG_SAFETY_DB_PATH", "drug_safety.db")
+
+
+def drug_db_enabled() -> bool:
+    return os.getenv("DRUG_DB_ENABLED", "true").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+    )
+
 
 def uses_mock_llm() -> bool:
     return os.getenv("LLM_PROVIDER", "mock").strip().lower() == "mock"

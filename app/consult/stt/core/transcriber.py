@@ -29,6 +29,11 @@ class Transcriber(ABC):
 
 
 class WhisperTranscriber(Transcriber):
+    _MEDICAL_PROMPT = (
+        "처방전, 약봉투, 복용량, 식후 30분, 타이레놀, 아목시실린, "
+        "항생제, 소화제, 진통제, 1일 3회, 1정, 복약, 부작용"
+    )
+
     def __init__(self, model_size: str = "medium", language: str = "ko",
                  device: str = "cpu", compute_type: str = "int8"):
         logger.info("WhisperTranscriber 초기화 중 (model=%s, device=%s, compute_type=%s)", model_size, device, compute_type)
@@ -39,7 +44,12 @@ class WhisperTranscriber(Transcriber):
 
     def transcribe(self, file_path: str) -> TranscriptionResult:
         logger.info("[WhisperTranscriber] 전사 시작: %s", file_path)
-        segments, info = self._model.transcribe(file_path, language=self._language)
+        segments_gen, info = self._model.transcribe(
+            file_path,
+            language=self._language,
+            initial_prompt=self._MEDICAL_PROMPT,
+        )
+        segments = list(segments_gen)
         text = " ".join(segment.text.strip() for segment in segments)
         logger.info("[WhisperTranscriber] 전사 완료 - 언어=%s, 길이=%.1fs, 텍스트 길이=%d자", info.language, info.duration, len(text))
         logger.debug("[WhisperTranscriber] 결과 텍스트: %s", text)
@@ -126,7 +136,11 @@ class ClovaSpeechTranscriber(Transcriber):
         text = " ".join(s.text for s in segments) if segments else body.get("text", "")
         duration = body.get("segments", [{}])[-1].get("end", 0) / 1000 if body.get("segments") else 0.0
 
-        logger.info("[ClovaSpeechTranscriber] 전사 완료 - 화자 수=%d, 텍스트 길이=%d자", len({s.speaker for s in segments}), len(text))
+        speakers = sorted({s.speaker for s in segments})
+        logger.info("[ClovaSpeechTranscriber] 전사 완료 - 화자 수=%d(%s), 세그먼트 수=%d, 길이=%.1fs, 텍스트 길이=%d자",
+                    len(speakers), ", ".join(speakers), len(segments), duration, len(text))
+        for seg in segments:
+            logger.info("[ClovaSpeechTranscriber] [%.1fs~%.1fs] %s: %s", seg.start, seg.end, seg.speaker, seg.text)
         logger.debug("[ClovaSpeechTranscriber] 결과 텍스트: %s", text)
 
         return TranscriptionResult(text=text, language="ko", duration=duration, segments=segments)
