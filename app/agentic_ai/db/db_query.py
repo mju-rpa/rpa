@@ -176,22 +176,25 @@ class DrugDB:
             warn_type : 문서 유형 필터 (선택)
             n         : 반환 결과 수
         """
-        col = self._vec.get_collection("drug_warnings")
-
-        # 메타데이터 필터 구성
-        where = {"item_name": item_name}
-        if warn_type:
-            where = {"$and": [{"item_name": item_name}, {"type": warn_type}]}
-
         try:
-            result = col.query(
-                query_texts=[query],
-                where=where,
-                n_results=n,
-            )
+            col = self._vec.get_collection("drug_warnings")
+
+            # 메타데이터 필터 구성
+            where = {"item_name": item_name}
+            if warn_type:
+                where = {"$and": [{"item_name": item_name}, {"type": warn_type}]}
+
+            try:
+                result = col.query(
+                    query_texts=[query],
+                    where=where,
+                    n_results=n,
+                )
+            except Exception:
+                # 해당 약품 데이터 없으면 필터 없이 검색
+                result = col.query(query_texts=[query], n_results=n)
         except Exception:
-            # 해당 약품 데이터 없으면 필터 없이 검색
-            result = col.query(query_texts=[query], n_results=n)
+            return []
 
         return [
             {
@@ -212,15 +215,18 @@ class DrugDB:
         """
         [방법 1] 메타데이터 필터링 적용 노인주의 검색.
         """
-        col = self._vec.get_collection("elderly_warnings")
         try:
-            result = col.query(
-                query_texts=[query],
-                where={"제품명": drug_name},
-                n_results=n,
-            )
+            col = self._vec.get_collection("elderly_warnings")
+            try:
+                result = col.query(
+                    query_texts=[query],
+                    where={"제품명": drug_name},
+                    n_results=n,
+                )
+            except Exception:
+                result = col.query(query_texts=[query], n_results=n)
         except Exception:
-            result = col.query(query_texts=[query], n_results=n)
+            return []
 
         return [
             {"document": doc, "metadata": meta}
@@ -269,18 +275,21 @@ class DrugDB:
         else:
             # 2단계: 정확 매칭 실패 → 벡터 검색으로 유사 약품 찾기
             result["source"] = "벡터_DB_유사검색"
-            col = self._vec.get_collection("drug_warnings")
-            vec_result = col.query(
-                query_texts=[f"{drug_name} 주의사항"],
-                n_results=3,
-            )
-            result["supplementary"] = [
-                {"document": doc, "metadata": meta}
-                for doc, meta in zip(
-                    vec_result["documents"][0],
-                    vec_result["metadatas"][0],
+            try:
+                col = self._vec.get_collection("drug_warnings")
+                vec_result = col.query(
+                    query_texts=[f"{drug_name} 주의사항"],
+                    n_results=3,
                 )
-            ]
+                result["supplementary"] = [
+                    {"document": doc, "metadata": meta}
+                    for doc, meta in zip(
+                        vec_result["documents"][0],
+                        vec_result["metadatas"][0],
+                    )
+                ]
+            except Exception:
+                result["supplementary"] = []
 
         return result
 
