@@ -16,4 +16,5 @@ crewai>=0.80.0
 chromadb>=0.6.0
 
 # Agentic AI에서 분석이 안돼서 추가.
-sentence-transformers>=2.2.0
+# render에서 용량 문제로 설치 안되니까 그냥 pass
+# sentence-transformers>=2.2.0
